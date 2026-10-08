@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>LicitaETP — Estudo Técnico Preliminar | Lei nº 14.133/2021</title>
+
+<!-- pdfMake -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<!-- ============================ HEADER ============================ -->
+<header class="app-header">
+  <div class="app-header-inner">
+    <div class="brand">
+      <div class="brand-logo">ETP</div>
+      <div class="brand-text">
+        <h1>LicitaETP</h1>
+        <p>Estudo Técnico Preliminar · Lei nº 14.133/2021, art. 18, § 1º</p>
+      </div>
+    </div>
+
+    <div class="header-actions">
+      <span id="scoreBadge" class="badge badge-neutral">Conformidade —</span>
+      <button class="btn btn-ghost" onclick="exportarJSON()">Exportar JSON</button>
+      <button class="btn btn-accent" onclick="gerarPDF()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        Gerar PDF do ETP
+      </button>
+    </div>
+  </div>
+</header>
+
+<div class="app-layout">
+
+  <!-- ============================ SIDEBAR ============================ -->
+  <aside class="sidebar">
+    <div class="card sidebar-card">
+      <div class="sidebar-top">
+        <div class="sidebar-row">
+          <span class="sidebar-label">Etapas</span>
+          <span id="stepCounter" class="sidebar-counter">1 / 13</span>
+        </div>
+        <div class="progress-track">
+          <div id="progressBar" class="progress-fill" style="width:7.7%"></div>
+        </div>
+      </div>
+      <nav id="stepNav" class="step-nav"></nav>
+    </div>
+  </aside>
+
+  <!-- ============================ MAIN ============================ -->
+  <main class="main-area">
+    <div class="card main-card">
+
+      <!-- ---------- 0 · IDENTIFICAÇÃO ---------- -->
+      <section data-panel="0" class="panel">
+        <div class="panel-head">
+          <h2 class="panel-title">Identificação do Estudo Técnico Preliminar</h2>
+          <p class="panel-desc">Dados institucionais que compõem a capa e o termo de abertura executivo do documento.</p>
+        </div>
+
+        <div class="grid grid-3">
+          <div class="col-2">
+            <label class="lbl">Órgão / Entidade</label>
+            <input id="orgao" class="inp" placeholder="Ex.: Tribunal Regional Federal da 1ª Região" />
+          </div>
+          <div>
+            <label class="lbl">UASG / Código</label>
+            <input id="uasg" class="inp" placeholder="Ex.: 123456" />
+          </div>
+          <div class="col-2">
+            <label class="lbl">Unidade / Setor Demandante</label>
+            <input id="unidade" class="inp" placeholder="Ex.: Coordenação de Tecnologia da Informação" />
+          </div>
+          <div>
+            <label class="lbl">Exercício</label>
+            <input id="exercicio" class="inp" value="2026" />
+          </div>
+          <div>
+            <label class="lbl">Nº do ETP</label>
+            <input id="numeroEtp" class="inp" value="042" />
+          </div>
+          <div>
+            <label class="lbl">Processo Administrativo</label>
+            <input id="processo" class="inp" placeholder="Ex.: 00000.000123/2026-10" />
+          </div>
+          <div>
+            <label class="lbl">Data de Elaboração</label>
+            <input id="dataElaboracao" type="date" class="inp" />
+          </div>
+          <div class="col-3">
+            <label class="lbl">Objeto da Contratação (resumo)</label>
+            <input id="objeto" class="inp" placeholder="Ex.: Aquisição de 120 microcomputadores desktop para renovação do parque tecnológico" />
+          </div>
+          <div class="col-2">
+            <label class="lbl">Responsável pela Elaboração</label>
+            <input id="responsavel" class="inp" placeholder="Nome completo" />
+          </div>
+          <div>
+            <label class="lbl">Cargo / Função</label>
+            <input id="cargoResponsavel" class="inp" placeholder="Ex.: Analista Judiciário" />
+          </div>
+          <div>
+            <label class="lbl">E-mail Institucional</label>
+            <input id="email" class="inp" placeholder="nome@orgao.gov.br" />
+          </div>
+          <div>
+            <label class="lbl">Telefone</label>
+            <input id="telefone" class="inp" placeholder="(00) 0000-0000" />
+          </div>
+          <div>
+            <label class="lbl">Logotipo Institucional</label>
+            <input id="logoFile" type="file" accept="image/*" class="inp inp-file" />
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- 1 · INCISO I ---------- -->
+      <section data-panel="1" class="panel hidden">
+        <div class="panel-head">
+          <span class="badge badge-inciso">Art. 18, § 1º, I</span>
+          <h2 class="panel-title">Descrição da Necessidade</h2>
+          <p class="panel-desc">Demonstração do problema a ser resolvido sob a ótica do interesse público.</p>
+        </div>
+        <div>
+          <label class="lbl">Necessidade / Problema a ser resolvido *</label>
+          <textarea id="necessidade" class="ta" placeholder="Descreva de forma objetiva o problema público, sua dimensão, a população/órgão afetado e o impacto da não contratação."></textarea>
+        </div>
+        <div class="grid grid-2">
+          <div>
+            <label class="lbl">Causa-raiz do problema</label>
+            <textarea id="causaRaiz" class="ta ta-sm" placeholder="Fatores estruturais que originaram a demanda"></textarea>
+          </div>
+          <div>
+            <label class="lbl">Público-alvo / Beneficiários</label>
+            <textarea id="publicoAlvo" class="ta ta-sm" placeholder="Servidores, cidadãos, unidades administrativas atingidas"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- 2 · INCISO II ---------- -->
+      <section data-panel="2" class="panel hidden">
+        <div class="panel-head">
+          <span class="badge badge-inciso">Art. 18, § 1º, II</span>
+          <h2 class="panel-title">Alinhamento ao Plano de Contratações Anual (PCA)</h2>
+          <p class="panel-desc">Demonstração da compatibilidade com o PCA e com o planejamento estratégico do órgão.</p>
+        </div>
+        <div class="grid grid-3">
+          <div>
+            <label class="lbl">Demanda prevista no PCA?</label>
+            <select id="pcaPrevisto" class="sel">
+              <option value="Sim">Sim — prevista no PCA</option>
+              <option value="Não">Não — inclusão/ajuste necessário</option>
+              <option value="Em revisão">Em revisão pelo setor competente</option>
+            </select>
+          </div>
+          <div class="col-2">
+            <label class="lbl">Item / Código do PCA</label>
+            <input id="pcaItem" class="inp" placeholder="Ex.: Item 42 — Soluções de TI" />
+          </div>
+        </div>
+        <div>
+          <label class="lbl">Justificativa do Alinhamento</label>
+          <textarea id="pcaJustificativa" class="ta" placeholder="Relacione a contratação ao Planejamento Estratégico (PEI/PDI), ao PCA vigente e às metas institucionais."></textarea>
+        </div>
+      </section>
+
+      <!-- ---------- 3 · INCISO III ---------- -->
+      <section data-panel="3" class="panel hidden">
+        <div class="panel-head">
+          <span class="badge badge-inciso">Art. 18, § 1º, III</span>
+          <h2 class="panel-title">Requisitos da Contratação</h2>
+          <p class="panel-desc">Requisitos técnicos, de sustentabilidade, de habilitação e de manutenção.</p>
+        </div>
+        <div>
+          <label class="lbl">Critérios de Sustentabilidade Aplicáveis</label>
+          <div class="grid grid-2 checks">
+            <label class="chk"><input type="checkbox" name="sustent" value="IN nº 01/2010 — SLTI/MPOG"><span>IN nº 01/2010 — SLTI/MPOG</span></label>
+            <label class="chk"><input type="checkbox" name="sustent" value="Lei nº 12.305/2010 — PNRS (logística reversa)"><span>PNRS — Logística reversa (Lei 12.305/2010)</span></label>
+            <label class="chk"><input type="checkbox" name="sustent" value="Eficiência energética — Procel/INMETRO"><span>Eficiência energética (Procel / INMETRO)</span></label>
+            <label class="chk"><input type="checkbox" name="sustent" value="Acessibilidade — Lei 13.146/2015 e NBR 9050"><span>Acessibilidade (Lei 13.146/2015)</span></label>
+            <label class="chk"><input type="checkbox" name="sustent" value="Bens recicláveis, reciclados ou biodegradáveis"><span>Bens recicláveis / reciclados</span></label>
+            <label class="chk"><input type="checkbox" name="sustent" value="Outros critérios ambientais"><span>Outros critérios ambientais</span></label>
+          </div>
+        </div>
+        <div class="grid grid-2">
+          <div>
+            <label class="lbl">Requisitos Técnicos e de Desempenho</label>
+            <textarea id="reqTecnicos" class="ta ta-sm" placeholder="Especificações mínimas, padrões de qualidade, normas ABNT"></textarea>
+          </div>
+          <div>
+            <label class="lbl">Requisitos de Habilitação Técnica</label>
+            <textarea id="reqHabilitacao" class="ta ta-sm" placeholder="Atestados, registro profissional, qualificação técnica"></textarea>
+          </div>
+          <div>
+            <label class="lbl">Garantia, Assistência Técnica e Manutenção</label>
+            <textarea id="reqGarantia" class="ta ta-sm" placeholder="Prazo de garantia, SLA, suporte"></textarea>
+          </div>
+          <div>
+            <label class="lbl">Embalagem, Entrega e Recebimento</label>
+            <textarea id="reqEntrega" class="ta ta-sm" placeholder="Prazos, local de entrega, critérios de aceite"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- 4 · INCISO IV ---------- -->
+      <section data-panel="4" class="panel hidden">
+        <div class="panel-head row-between">
+          <div>
+            <span class="badge badge-inciso">Art. 18, § 1º, IV</span>
+            <h2 class="panel-title">Estimativa de Quantidades e Memória de Cálculo</h2>
+            <p class="panel-desc">Quantidades fundamentadas em dados concretos e metodologia reproduzível.</p>
+          </div>
+          <button class="btn btn-ghost" onclick="addQtd()">+ Item</button>
+        </div>
+        <div class="table-wrap">
+          <table class="grid-table">
+            <thead><tr>
+              <th style="width:8%">Item</th>
+              <th style="width:26%">Descrição</th>
+              <th style="width:10%">Qtd.</th>
+              <th style="width:10%">Unid.</th>
+              <th style="width:38%">Memória de Cálculo</th>
+              <th style="width:8%"></th>
+            </tr></thead>
+            <tbody id="tbQtd"></tbody>
+          </table>
+        </div>
+        <div>
+          <label class="lbl">Metodologia Geral da Estimativa</label>
+          <textarea id="metodoQtd" class="ta ta-sm" placeholder="Ex.: série histórica 2023-2025, projeção de crescimento, taxa de substituição anual"></textarea>
+        </div>
+      </section>
+
+      <!-- ---------- 5 · INCISO V ---------- -->
+      <section data-panel="5" class="panel hidden">
+        <div class="panel-head row-between">
+          <div>
+            <span class="badge badge-inciso">Art. 18, § 1º, V</span>
+            <h2 class="panel-title">Levantamento de Mercado e Alternativas</h2>
+            <p class="panel-desc">Análise de soluções disponíveis, vantagens, riscos e conclusão motivada.</p>
+          </div>
+          <button class="btn btn-ghost" onclick="addMercado()">+ Alternativa</button>
+        </div>
+        <div class="table-wrap">
+          <table class="grid-table">
+            <thead><tr>
+              <th style="width:20%">Alternativa</th>
+              <th style="width:30%">Descrição</th>
+              <th style="width:22%">Vantagens</th>
+              <th style="width:22%">Riscos</th>
+              <th style="width:6%"></th>
+            </tr></thead>
+            <tbody id="tbMercado"></tbody>
+          </table>
+        </div>
+        <div>
+          <label class="lbl">Conclusão do Levantamento de Mercado</label>
+          <textarea id="conclusaoMercado" class="ta ta-sm" placeholder="Justifique a alternativa selecionada e a razão da exclusão das demais"></textarea>
+        </div>
+      </section>
+
+      <!-- ---------- 6 · INCISO VI ---------- -->
+      <section data-panel="6" class="panel hidden">
+        <div class="panel-head row-between">
+          <div>
+            <span class="badge badge-inciso">Art. 18, § 1º, VI</span>
+            <h2 class="panel-title">Estimativa Preliminar de Preços</h2>
+            <p class="panel-desc">Método de cotação, fontes consultadas e valores de referência.</p>
+          </div>
+          <button class="btn btn-ghost" onclick="addPreco()">+ Cotação</button>
+        </div>
+        <div>
+          <label class="lbl">Método de Estimativa Adotado (art. 23, Lei 14.133/2021)</label>
+          <select id="metodoPreco" class="sel">
+            <option>Painel de Preços (Compras.gov.br)</option>
+            <option>Pesquisa direta de mercado (mín. 3 fornecedores)</option>
+            <option>Contratações similares de outros entes públicos</option>
+            <option>Mídia especializada / sítios eletrônicos especializados</option>
+            <option>Base Nacional de Preços em Saúde / tabelas setoriais</option>
+            <option>Metodologia mista (combinação de fontes)</option>
+          </select>
+        </div>
+        <div class="table-wrap">
+          <table class="grid-table">
+            <thead><tr>
+              <th style="width:24%">Item</th>
+              <th style="width:26%">Fonte / Fornecedor</th>
+              <th style="width:12%">Valor Unit.</th>
+              <th style="width:10%">Qtd.</th>
+              <th style="width:14%">Total</th>
+              <th style="width:6%"></th>
+            </tr></thead>
+            <tbody id="tbPreco"></tbody>
+          </table>
+        </div>
+        <div class="grid grid-3">
+          <div class="col-2">
+            <label class="lbl">Observações sobre a Estimativa</label>
+            <textarea id="obsPreco" class="ta ta-sm" placeholder="Datas das cotações, tratamento estatístico, exclusão de valores inexequíveis"></textarea>
+          </div>
+          <div class="total-box">
+            <p class="total-box-lbl">Valor Total Estimado</p>
+            <p id="valorTotal" class="total-box-value">R$ 0,00</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- 7 · INCISO VII ---------- -->
+      <section data-panel="7" class="panel hidden">
+        <div class="panel-head">
+          <span class="badge badge-inciso">Art. 18, § 1º, VII</span>
+          <h2 class="panel-title">Descrição da Solução como um Todo</h2>
+          <p class="panel-desc">Visão integrada do ciclo de vida do objeto contratado.</p>
+        </div>
+        <div>
+          <label class="lbl">Descrição Integrada da Solução *</label>
+          <textarea id="descricaoSolucao" class="ta" placeholder="Descreva o conjunto de bens/serviços, sua integração, ciclo de vida e condições de execução."></textarea>
+        </div>
+        <div class="grid grid-2">
+          <div>
+            <label class="lbl">Entregas (Deliverables) e Prazos</label>
+            <textarea id="entregas" class="ta ta-sm" placeholder="- Lote 1: entrega em até 30 dias&#10;- Instalação e configuração&#10;- Treinamento de usuários"></textarea>
+          </div>
+          <div>
+            <label class="lbl">Ciclo de Vida e Sustentabilidade</label>
+            <textarea id="cicloVida" class="ta ta-sm" placeholder="Vida útil estimada, custos de manutenção, descarte ambientalmente adequado"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- 8 · INCISO VIII ---------- -->
+      <section data-panel="8" class="panel hidden">
+        <div class="panel-head">
+          <span class="badge badge-inciso">Art. 18, § 1º, VIII</span>
+          <h2 class="panel-title">Justificativa para Parcelamento (ou não)</h2>
+          <p class="panel-desc">Fundamentação técnica e econômica sobre a divisão do objeto.</p>
+        </div>
+        <div class="grid grid-3">
+          <div>
+            <label class="lbl">Haverá parcelamento?</label>
+            <select id="parcelar" class="sel">
+              <option value="Não">Não — objeto indivisível</option>
+              <option value="Sim">Sim — parcelamento por lote/item</option>
+              <option value="Parcial">Parcial — apenas itens específicos</option>
+            </select>
+          </div>
+          <div class="col-2">
+            <label class="lbl">Itens / Lotes Parceláveis</label>
+            <input id="itensParcelaveis" class="inp" placeholder="Ex.: Lote 1 — Desktops; Lote 2 — Monitores" />
+          </div>
+        </div>
+        <div>
+          <label class="lbl">Fundamentação da Decisão</label>
+          <textarea id="justificativaParcelamento" class="ta" placeholder="Demonstre a viabilidade ou inviabilidade técnica/econômica da divisão (art. 40, V, 'b', Lei 14.133/2021)."></textarea>
+        </div>
+      </section>
+
+      <!-- ---------- 9 · INCISO IX ---------- -->
+      <section data-panel="9" class="panel hidden">
+        <div class="panel-head">
+          <span class="badge badge-inciso">Art. 18, § 1º, IX</span>
+          <h2 class="panel-title">Resultados Pretendidos</h2>
+          <p class="panel-desc">Resultados mensuráveis e ganhos de economicidade.</p>
+        </div>
+        <div>
+          <label class="lbl">Resultados Esperados *</label>
+          <textarea id="resultados" class="ta" placeholder="Descreva os resultados sob a ótica da eficiência, eficácia e efetividade, com indicadores e metas."></textarea>
+        </div>
+        <div class="grid grid-2">
+          <div>
+            <label class="lbl">Ganhos de Economicidade</label>
+            <textarea id="economicidade" class="ta ta-sm" placeholder="Comparativo custo-benefício, redução de desperdício"></textarea>
+          </div>
+          <div>
+            <label class="lbl">Indicadores de Aferição</label>
+            <textarea id="indicadores" class="ta ta-sm" placeholder="Ex.: disponibilidade ≥ 99,5%; redução de 30% nos chamados"></textarea>
+          </div>
+        </div>
+      </section>
+
+      <!-- ---------- 10 · INCISO X ---------- -->
+      <section data-panel="10" class="panel hidden">
+        <div class="panel-head">
+          <span class="badge badge-inciso">Art. 18, § 1º, X</span>
+          <h2 class="panel-title">Providências Prévias e Contratações Correlatas</h2>
+          <p class="panel-desc">Ações necessárias antes da contratação e dependências entre contratações.</p>
+        </div>
+        <div class="grid grid-2">
+          <div>
+            <label class="lbl">Providências Prévias ao Certame</label>
+            <textarea id="providencias" class="ta" placeholder="- Adequação do ambiente físico&#10;- Capacitação de servidores&#10;- Dotação orçamentária"></textarea>
+          </div>
+          <div>
+            <label class="lbl">Contratações Correlatas e Interdependentes</label>
+            <textarea id="correlatas" class="ta" placeholder="Ex.: link de dados, licenciamento, obra de reforma do CPD"></textarea>
+          </div>
+        </div>
+        <div>
+          <label class="lbl">Impacto da Não Realização das Providências</label>
+          <textarea id="impactoProvidencias" class="ta ta-sm" placeholder="Riscos de execução caso as providências prévias não sejam concluídas tempestivamente"></textarea>
+        </div>
+      </section>
+
+      <!-- ---------- 11 · INCISO XI ---------- -->
+      <section data-panel="11" class="panel hidden">
+        <div class="panel-head">
+          <span class="badge badge-inciso">Art. 18, § 1º, XI</span>
+          <h2 class="panel-title">Posicionamento Conclusivo sobre a Viabilidade</h2>
+          <p class="panel-desc">Manifestação técnica conclusiva quanto à adequação e viabilidade da contratação.</p>
+        </div>
+        <div class="grid grid-3">
+          <div>
+            <label class="lbl">Posicionamento *</label>
+            <select id="posicionamento" class="sel">
+              <option>Viável</option>
+              <option>Viável com ressalvas</option>
+              <option>Inviável</option>
+            </select>
+          </div>
+          <div class="col-2">
+            <label class="lbl">Recomendações e Condicionantes</label>
+            <input id="recomendacoes" class="inp" placeholder="Ex.: prosseguimento condicionado à disponibilidade orçamentária" />
+          </div>
+        </div>
+        <div>
+          <label class="lbl">Conclusão Técnica Fundamentada *</label>
+          <textarea id="conclusao" class="ta" placeholder="Conclua pela viabilidade (ou não) da contratação, sintetizando necessidade, solução, estimativa e resultados."></textarea>
+        </div>
+      </section>
+
+      <!-- ---------- 12 · APROVADORES ---------- -->
+      <section data-panel="12" class="panel hidden">
+        <div class="panel-head row-between">
+          <div>
+            <span class="badge badge-aprov">Folha de Aprovação</span>
+            <h2 class="panel-title">Elaboradores, Validadores e Aprovadores</h2>
+            <p class="panel-desc">Grade simétrica dinâmica — suporta múltiplos agentes sem transbordo de página.</p>
+          </div>
+          <button class="btn btn-ghost" onclick="addAprovador()">+ Agente</button>
+        </div>
+        <div id="listaAprovadores" class="aprov-list"></div>
+      </section>
+
+    </div>
+
+    <!-- NAVEGAÇÃO -->
+    <div class="nav-bar">
+      <button id="btnVoltar" class="btn btn-ghost" onclick="goTo(current-1)">← Voltar</button>
+      <div class="nav-bar-right">
+        <button id="btnProximo" class="btn btn-primary" onclick="goTo(current+1)">Próximo →</button>
+        <button id="btnGerar" class="btn btn-accent hidden" onclick="gerarPDF()">Gerar PDF do ETP</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
