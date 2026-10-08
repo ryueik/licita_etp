@@ -272,3 +272,123 @@ body{
 ::-webkit-scrollbar-thumb:hover{background:var(--bd-3)}
 
 .hidden{display:none !important}
+
+/* =====================================================================
+   DROPZONE — DRAG & DROP PROFISSIONAL
+   ===================================================================== */
+.dropzone{
+  position:relative;
+  border:2px dashed var(--bd-2);
+  border-radius:var(--r-md);
+  background:var(--bg-3);
+  padding:20px;
+  transition:all .2s cubic-bezier(.4,0,.2,1);
+  cursor:pointer;
+  min-height:96px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.dropzone:hover{
+  border-color:var(--bd-3);
+  background:var(--bg-4);
+}
+.dropzone.dragover{
+  border-color:var(--ac);
+  background:rgba(16,185,129,.10);
+  box-shadow:var(--sh-glow);
+  transform:scale(1.01);
+}
+.dropzone.dragover .dropzone-icon{
+  color:var(--ac);
+  transform:translateY(-3px) scale(1.08);
+}
+.dropzone.has-file{
+  border-style:solid;
+  border-color:var(--ac-line);
+  background:rgba(16,185,129,.05);
+  cursor:default;
+}
+.dropzone.has-file:hover{ background:rgba(16,185,129,.07); }
+
+/* Estado vazio */
+.dropzone-empty{
+  text-align:center;
+  pointer-events:none;
+  user-select:none;
+}
+.dropzone-icon{
+  color:var(--tx-3);
+  margin-bottom:8px;
+  transition:.2s;
+  display:inline-flex;
+}
+.dropzone-title{
+  font-size:13px;
+  font-weight:700;
+  color:var(--tx-1);
+  margin-bottom:3px;
+}
+.dropzone-hint{
+  font-size:11px;
+  color:var(--tx-3);
+}
+.dropzone-hint strong{ color:var(--ac); font-weight:700; }
+
+/* Preview do arquivo */
+.dropzone-preview{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  width:100%;
+  animation:fadeIn .25s ease;
+}
+@keyframes fadeIn{
+  from{ opacity:0; transform:translateY(4px); }
+  to{ opacity:1; transform:translateY(0); }
+}
+.dropzone-preview img{
+  width:64px;
+  height:64px;
+  object-fit:contain;
+  border-radius:var(--r-sm);
+  background:var(--bg-1);
+  border:1px solid var(--bd-1);
+  padding:4px;
+  flex-shrink:0;
+}
+.dropzone-preview-info{
+  flex:1;
+  min-width:0;
+  display:flex;
+  flex-direction:column;
+  gap:3px;
+}
+.dropzone-file-name{
+  font-size:12.5px;
+  font-weight:700;
+  color:var(--tx-0);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.dropzone-file-size{
+  font-size:11px;
+  color:var(--ac);
+  font-weight:700;
+  letter-spacing:.02em;
+}
+.dropzone-preview .btn-xs{
+  flex-shrink:0;
+  padding:4px 10px;
+}
+
+/* =====================================================================
+   BOTÕES DO HEADER — ícones compactos
+   ===================================================================== */
+.header-actions .btn svg{ flex-shrink:0; }
+
+@media (max-width:768px){
+  .header-actions .btn span:not(.badge){ display:none; }
+  .header-actions{ gap:6px; }
+}
