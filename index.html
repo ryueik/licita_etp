@@ -1,15 +1,21 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-BR" data-theme="light">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>LicitaETP — Estudo Técnico Preliminar | Lei nº 14.133/2021</title>
 
-<!-- Favicon SVG verde (injetado dinamicamente por app.js) -->
-<link id="favicon" rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2310B981'/%3E%3Ctext x='32' y='43' font-family='system-ui' font-size='26' font-weight='900' fill='%2304140E' text-anchor='middle'%3EETP%3C/text%3E%3C/svg%3E" />
+<!-- Favicon SVG verde -->
+<link id="favicon" rel="icon" type="image/svg+xml"
+  href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2310B981'/%3E%3Ctext x='32' y='43' font-family='system-ui' font-size='26' font-weight='900' fill='%2304140E' text-anchor='middle'%3EETP%3C/text%3E%3C/svg%3E" />
 
+<!-- pdfMake -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
+
+<!-- pdf.js (leitura de DFD em PDF) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -18,9 +24,7 @@
 <header class="app-header">
   <div class="app-header-inner">
     <div class="brand">
-      <div class="brand-logo" id="brandLogo">
-        <!-- SVG logo verde "ETP" — injetado por app.js -->
-      </div>
+      <div class="brand-logo" id="brandLogo"></div>
       <div class="brand-text">
         <h1>LicitaETP</h1>
         <p>Estudo Técnico Preliminar · Lei nº 14.133/2021, art. 18, § 1º</p>
@@ -30,20 +34,34 @@
     <div class="header-actions">
       <span id="scoreBadge" class="badge badge-neutral">Conformidade —</span>
 
-      <!-- NOVO: Botões de persistência JSON -->
+      <button class="btn btn-ghost btn-icon" onclick="abrirImportarDFD()" title="Importar DFD (PDF/JSON)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
+        <span>Importar DFD</span>
+      </button>
+
       <input type="file" id="jsonFile" accept=".json,application/json" hidden />
-      <button class="btn btn-ghost" onclick="salvarRascunho()" title="Baixar rascunho em JSON">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        Salvar
+      <button class="btn btn-ghost btn-icon" onclick="salvarRascunho()" title="Salvar rascunho (JSON)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        <span>Salvar</span>
       </button>
-      <button class="btn btn-ghost" onclick="abrirCarregarRascunho()" title="Carregar rascunho JSON">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        Carregar
+      <button class="btn btn-ghost btn-icon" onclick="abrirCarregarRascunho()" title="Carregar rascunho (JSON)">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <span>Carregar</span>
       </button>
-      <button class="btn btn-ghost" onclick="exportarJSON()" title="Exportar pacote de auditoria">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="15" y2="15"/></svg>
-        Auditoria
+
+      <button class="btn btn-ghost btn-icon" onclick="abrirAjuda()" title="Ajuda / Sobre">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
       </button>
+
+      <button class="btn btn-ghost btn-icon" id="themeToggle" onclick="alternarTema()" title="Alternar tema (Dark / Light)">
+        <svg id="iconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+          <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
+        </svg>
+        <svg id="iconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+        </svg>
+      </button>
+
       <button class="btn btn-accent" onclick="gerarPDF()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
         Gerar PDF
@@ -59,7 +77,7 @@
     <div class="card sidebar-card">
       <div class="sidebar-top">
         <div class="sidebar-row">
-          <span class="sidebar-label">Etapas</span>
+          <span class="sidebar-label">Etapas do ETP</span>
           <span id="stepCounter" class="sidebar-counter">1 / 13</span>
         </div>
         <div class="progress-track">
@@ -77,8 +95,28 @@
       <!-- ---------- 0 · IDENTIFICAÇÃO ---------- -->
       <section data-panel="0" class="panel">
         <div class="panel-head">
-          <h2 class="panel-title">Identificação do Estudo Técnico Preliminar</h2>
-          <p class="panel-desc">Dados institucionais que compõem a capa e o termo de abertura executivo do documento.</p>
+          <div class="panel-head-left">
+            <span class="step-badge">Etapa 1</span>
+            <h2 class="panel-title">Identificação do Estudo Técnico Preliminar</h2>
+            <p class="panel-desc">Dados institucionais que compõem a capa e o termo de abertura executivo do documento.</p>
+          </div>
+        </div>
+
+        <!-- Callout de importação DFD -->
+        <div class="dfd-callout" onclick="abrirImportarDFD()" role="button" tabindex="0">
+          <div class="dfd-callout-icon">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M12 3v13"/><polyline points="7 11 12 16 17 11"/><path d="M5 21h14"/>
+            </svg>
+          </div>
+          <div class="dfd-callout-text">
+            <strong>Importar DFD automaticamente</strong>
+            <span>Arraste aqui o JSON (exportado do LicitaReq) ou o PDF oficial do DFD — os campos serão preenchidos automaticamente.</span>
+          </div>
+          <div class="dfd-callout-action">
+            <span class="dfd-chip">PDF</span>
+            <span class="dfd-chip">JSON</span>
+          </div>
         </div>
 
         <div class="grid grid-3">
@@ -96,11 +134,14 @@
           </div>
           <div>
             <label class="lbl">Exercício</label>
-            <input id="exercicio" class="inp" value="2026" />
+            <input id="exercicio" class="inp" placeholder="2026" />
           </div>
           <div>
-            <label class="lbl">Nº do ETP</label>
-            <input id="numeroEtp" class="inp" value="042" />
+            <label class="lbl">Nº do ETP <span class="hint">(gerado automaticamente)</span></label>
+            <div class="inp-with-prefix">
+              <span class="prefix">ETP</span>
+              <input id="numeroEtp" class="inp inp-prefixed" placeholder="001" />
+            </div>
           </div>
           <div>
             <label class="lbl">Processo Administrativo</label>
@@ -131,14 +172,14 @@
             <input id="telefone" class="inp" placeholder="(00) 0000-0000" />
           </div>
 
-          <!-- ============ NOVO: DROPZONE DE LOGOTIPO ============ -->
+          <!-- Dropzone de logotipo -->
           <div class="col-3">
-            <label class="lbl">Logotipo Institucional (arraste ou clique)</label>
-            <div class="dropzone" id="logoDropzone" data-accept="image/*">
+            <label class="lbl">Logotipo Institucional</label>
+            <div class="dropzone" id="logoDropzone">
               <input type="file" id="logoFile" accept="image/*" hidden />
               <div class="dropzone-empty" id="logoDropzoneEmpty">
                 <div class="dropzone-icon">
-                  <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
                     <rect x="3" y="3" width="18" height="18" rx="3"/>
                     <circle cx="8.5" cy="8.5" r="1.5"/>
                     <polyline points="21 15 16 10 5 21"/>
@@ -148,33 +189,30 @@
                 <p class="dropzone-hint">ou <strong>clique para selecionar</strong> · PNG, JPG ou SVG · máx 2 MB</p>
               </div>
               <div class="dropzone-preview hidden" id="logoDropzonePreview">
-                <img id="logoPreviewImg" alt="Pré-visualização do logotipo" />
+                <img id="logoPreviewImg" alt="Logotipo" />
                 <div class="dropzone-preview-info">
                   <span id="logoPreviewName" class="dropzone-file-name">—</span>
                   <span id="logoPreviewSize" class="dropzone-file-size">—</span>
                 </div>
-                <button type="button" class="btn-xs" id="logoRemoveBtn" title="Remover logotipo">×</button>
+                <button type="button" class="btn-xs" id="logoRemoveBtn">×</button>
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- ====================================================== -->
-      <!-- As demais seções (1 a 12) permanecem iguais — inclusas -->
-      <!-- de forma abreviada aqui para foco nas novas features. -->
-      <!-- Cole aqui as seções 1..12 do arquivo anterior.        -->
-      <!-- ====================================================== -->
-
+      <!-- ---------- 1 · INCISO I ---------- -->
       <section data-panel="1" class="panel hidden">
         <div class="panel-head">
-          <span class="badge badge-inciso">Art. 18, § 1º, I</span>
-          <h2 class="panel-title">Descrição da Necessidade</h2>
-          <p class="panel-desc">Demonstração do problema a ser resolvido sob a ótica do interesse público.</p>
+          <div class="panel-head-left">
+            <span class="badge badge-inciso">Art. 18, § 1º, I</span>
+            <h2 class="panel-title">Descrição da Necessidade</h2>
+            <p class="panel-desc">Demonstração do problema a ser resolvido sob a ótica do interesse público.</p>
+          </div>
         </div>
         <div>
           <label class="lbl">Necessidade / Problema a ser resolvido *</label>
-          <textarea id="necessidade" class="ta" placeholder="Descreva o problema público..."></textarea>
+          <textarea id="necessidade" class="ta" placeholder="Descreva o problema público, sua dimensão, o público afetado e o impacto da não contratação."></textarea>
         </div>
         <div class="grid grid-2">
           <div><label class="lbl">Causa-raiz do problema</label><textarea id="causaRaiz" class="ta ta-sm"></textarea></div>
@@ -182,10 +220,14 @@
         </div>
       </section>
 
+      <!-- ---------- 2 · INCISO II ---------- -->
       <section data-panel="2" class="panel hidden">
         <div class="panel-head">
-          <span class="badge badge-inciso">Art. 18, § 1º, II</span>
-          <h2 class="panel-title">Alinhamento ao Plano de Contratações Anual (PCA)</h2>
+          <div class="panel-head-left">
+            <span class="badge badge-inciso">Art. 18, § 1º, II</span>
+            <h2 class="panel-title">Alinhamento ao Plano de Contratações Anual (PCA)</h2>
+            <p class="panel-desc">Demonstração da compatibilidade com o PCA e o planejamento estratégico do órgão.</p>
+          </div>
         </div>
         <div class="grid grid-3">
           <div>
@@ -201,18 +243,22 @@
         <div><label class="lbl">Justificativa do Alinhamento</label><textarea id="pcaJustificativa" class="ta"></textarea></div>
       </section>
 
+      <!-- ---------- 3 · INCISO III ---------- -->
       <section data-panel="3" class="panel hidden">
         <div class="panel-head">
-          <span class="badge badge-inciso">Art. 18, § 1º, III</span>
-          <h2 class="panel-title">Requisitos da Contratação</h2>
+          <div class="panel-head-left">
+            <span class="badge badge-inciso">Art. 18, § 1º, III</span>
+            <h2 class="panel-title">Requisitos da Contratação</h2>
+            <p class="panel-desc">Requisitos técnicos, de sustentabilidade, de habilitação e de manutenção.</p>
+          </div>
         </div>
         <div>
           <label class="lbl">Critérios de Sustentabilidade Aplicáveis</label>
           <div class="grid grid-2 checks">
             <label class="chk"><input type="checkbox" name="sustent" value="IN nº 01/2010 — SLTI/MPOG"><span>IN nº 01/2010 — SLTI/MPOG</span></label>
             <label class="chk"><input type="checkbox" name="sustent" value="Lei nº 12.305/2010 — PNRS (logística reversa)"><span>PNRS — Logística reversa</span></label>
-            <label class="chk"><input type="checkbox" name="sustent" value="Eficiência energética — Procel/INMETRO"><span>Eficiência energética</span></label>
-            <label class="chk"><input type="checkbox" name="sustent" value="Acessibilidade — Lei 13.146/2015 e NBR 9050"><span>Acessibilidade</span></label>
+            <label class="chk"><input type="checkbox" name="sustent" value="Eficiência energética — Procel/INMETRO"><span>Eficiência energética (Procel / INMETRO)</span></label>
+            <label class="chk"><input type="checkbox" name="sustent" value="Acessibilidade — Lei 13.146/2015 e NBR 9050"><span>Acessibilidade (Lei 13.146/2015)</span></label>
             <label class="chk"><input type="checkbox" name="sustent" value="Bens recicláveis, reciclados ou biodegradáveis"><span>Bens recicláveis / reciclados</span></label>
             <label class="chk"><input type="checkbox" name="sustent" value="Outros critérios ambientais"><span>Outros critérios ambientais</span></label>
           </div>
@@ -225,9 +271,14 @@
         </div>
       </section>
 
+      <!-- ---------- 4 · INCISO IV ---------- -->
       <section data-panel="4" class="panel hidden">
         <div class="panel-head row-between">
-          <div><span class="badge badge-inciso">Art. 18, § 1º, IV</span><h2 class="panel-title">Estimativa de Quantidades e Memória de Cálculo</h2></div>
+          <div class="panel-head-left">
+            <span class="badge badge-inciso">Art. 18, § 1º, IV</span>
+            <h2 class="panel-title">Estimativa de Quantidades e Memória de Cálculo</h2>
+            <p class="panel-desc">Quantidades fundamentadas em dados concretos e metodologia reproduzível.</p>
+          </div>
           <button class="btn btn-ghost" onclick="addQtd()">+ Item</button>
         </div>
         <div class="table-wrap">
@@ -239,9 +290,14 @@
         <div><label class="lbl">Metodologia Geral da Estimativa</label><textarea id="metodoQtd" class="ta ta-sm"></textarea></div>
       </section>
 
+      <!-- ---------- 5 · INCISO V ---------- -->
       <section data-panel="5" class="panel hidden">
         <div class="panel-head row-between">
-          <div><span class="badge badge-inciso">Art. 18, § 1º, V</span><h2 class="panel-title">Levantamento de Mercado e Alternativas</h2></div>
+          <div class="panel-head-left">
+            <span class="badge badge-inciso">Art. 18, § 1º, V</span>
+            <h2 class="panel-title">Levantamento de Mercado e Alternativas</h2>
+            <p class="panel-desc">Análise de soluções disponíveis, vantagens, riscos e conclusão motivada.</p>
+          </div>
           <button class="btn btn-ghost" onclick="addMercado()">+ Alternativa</button>
         </div>
         <div class="table-wrap">
@@ -253,9 +309,14 @@
         <div><label class="lbl">Conclusão do Levantamento de Mercado</label><textarea id="conclusaoMercado" class="ta ta-sm"></textarea></div>
       </section>
 
+      <!-- ---------- 6 · INCISO VI ---------- -->
       <section data-panel="6" class="panel hidden">
         <div class="panel-head row-between">
-          <div><span class="badge badge-inciso">Art. 18, § 1º, VI</span><h2 class="panel-title">Estimativa Preliminar de Preços</h2></div>
+          <div class="panel-head-left">
+            <span class="badge badge-inciso">Art. 18, § 1º, VI</span>
+            <h2 class="panel-title">Estimativa Preliminar de Preços</h2>
+            <p class="panel-desc">Método de cotação, fontes consultadas e valores de referência.</p>
+          </div>
           <button class="btn btn-ghost" onclick="addPreco()">+ Cotação</button>
         </div>
         <div>
@@ -284,10 +345,14 @@
         </div>
       </section>
 
+      <!-- ---------- 7 · INCISO VII ---------- -->
       <section data-panel="7" class="panel hidden">
         <div class="panel-head">
-          <span class="badge badge-inciso">Art. 18, § 1º, VII</span>
-          <h2 class="panel-title">Descrição da Solução como um Todo</h2>
+          <div class="panel-head-left">
+            <span class="badge badge-inciso">Art. 18, § 1º, VII</span>
+            <h2 class="panel-title">Descrição da Solução como um Todo</h2>
+            <p class="panel-desc">Visão integrada do ciclo de vida do objeto contratado.</p>
+          </div>
         </div>
         <div><label class="lbl">Descrição Integrada da Solução *</label><textarea id="descricaoSolucao" class="ta"></textarea></div>
         <div class="grid grid-2">
@@ -296,10 +361,14 @@
         </div>
       </section>
 
+      <!-- ---------- 8 · INCISO VIII ---------- -->
       <section data-panel="8" class="panel hidden">
         <div class="panel-head">
-          <span class="badge badge-inciso">Art. 18, § 1º, VIII</span>
-          <h2 class="panel-title">Justificativa para Parcelamento (ou não)</h2>
+          <div class="panel-head-left">
+            <span class="badge badge-inciso">Art. 18, § 1º, VIII</span>
+            <h2 class="panel-title">Justificativa para Parcelamento (ou não)</h2>
+            <p class="panel-desc">Fundamentação técnica e econômica sobre a divisão do objeto.</p>
+          </div>
         </div>
         <div class="grid grid-3">
           <div>
@@ -315,10 +384,14 @@
         <div><label class="lbl">Fundamentação da Decisão</label><textarea id="justificativaParcelamento" class="ta"></textarea></div>
       </section>
 
+      <!-- ---------- 9 · INCISO IX ---------- -->
       <section data-panel="9" class="panel hidden">
         <div class="panel-head">
-          <span class="badge badge-inciso">Art. 18, § 1º, IX</span>
-          <h2 class="panel-title">Resultados Pretendidos</h2>
+          <div class="panel-head-left">
+            <span class="badge badge-inciso">Art. 18, § 1º, IX</span>
+            <h2 class="panel-title">Resultados Pretendidos</h2>
+            <p class="panel-desc">Resultados mensuráveis e ganhos de economicidade.</p>
+          </div>
         </div>
         <div><label class="lbl">Resultados Esperados *</label><textarea id="resultados" class="ta"></textarea></div>
         <div class="grid grid-2">
@@ -327,10 +400,14 @@
         </div>
       </section>
 
+      <!-- ---------- 10 · INCISO X ---------- -->
       <section data-panel="10" class="panel hidden">
         <div class="panel-head">
-          <span class="badge badge-inciso">Art. 18, § 1º, X</span>
-          <h2 class="panel-title">Providências Prévias e Contratações Correlatas</h2>
+          <div class="panel-head-left">
+            <span class="badge badge-inciso">Art. 18, § 1º, X</span>
+            <h2 class="panel-title">Providências Prévias e Contratações Correlatas</h2>
+            <p class="panel-desc">Ações necessárias antes da contratação e dependências entre contratações.</p>
+          </div>
         </div>
         <div class="grid grid-2">
           <div><label class="lbl">Providências Prévias ao Certame</label><textarea id="providencias" class="ta"></textarea></div>
@@ -339,10 +416,14 @@
         <div><label class="lbl">Impacto da Não Realização das Providências</label><textarea id="impactoProvidencias" class="ta ta-sm"></textarea></div>
       </section>
 
+      <!-- ---------- 11 · INCISO XI ---------- -->
       <section data-panel="11" class="panel hidden">
         <div class="panel-head">
-          <span class="badge badge-inciso">Art. 18, § 1º, XI</span>
-          <h2 class="panel-title">Posicionamento Conclusivo sobre a Viabilidade</h2>
+          <div class="panel-head-left">
+            <span class="badge badge-inciso">Art. 18, § 1º, XI</span>
+            <h2 class="panel-title">Posicionamento Conclusivo sobre a Viabilidade</h2>
+            <p class="panel-desc">Manifestação técnica conclusiva quanto à adequação e viabilidade da contratação.</p>
+          </div>
         </div>
         <div class="grid grid-3">
           <div>
@@ -356,11 +437,13 @@
         <div><label class="lbl">Conclusão Técnica Fundamentada *</label><textarea id="conclusao" class="ta"></textarea></div>
       </section>
 
+      <!-- ---------- 12 · APROVADORES ---------- -->
       <section data-panel="12" class="panel hidden">
         <div class="panel-head row-between">
-          <div>
+          <div class="panel-head-left">
             <span class="badge badge-aprov">Folha de Aprovação</span>
             <h2 class="panel-title">Elaboradores, Validadores e Aprovadores</h2>
+            <p class="panel-desc">Grade simétrica dinâmica — suporta múltiplos agentes sem transbordo de página.</p>
           </div>
           <button class="btn btn-ghost" onclick="addAprovador()">+ Agente</button>
         </div>
@@ -377,6 +460,103 @@
       </div>
     </div>
   </main>
+</div>
+
+<!-- ============================ MODAL: WELCOME / TUTORIAL ============================ -->
+<div class="modal-overlay" id="welcomeModal" aria-hidden="true">
+  <div class="modal modal-welcome" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
+    <div class="modal-welcome-hero">
+      <div class="modal-welcome-logo" id="welcomeLogo"></div>
+      <span class="modal-welcome-badge">LicitaETP v2.0</span>
+    </div>
+    <h2 class="modal-title" id="welcomeTitle">Bem-vindo ao LicitaETP</h2>
+    <p class="modal-subtitle">
+      Sistema de elaboração do <strong>Estudo Técnico Preliminar</strong> em conformidade
+      com o <strong>art. 18, § 1º, da Lei nº 14.133/2021</strong> — integrado ao ecossistema
+      <em>LicitaReq</em> e <em>LicitaAudit</em>.
+    </p>
+
+    <div class="modal-welcome-grid">
+      <div class="welcome-card">
+        <div class="welcome-card-icon" style="background:rgba(59,130,246,.15);color:#3B82F6">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><polyline points="7 11 12 16 17 11"/><path d="M5 21h14"/></svg>
+        </div>
+        <h4>Importação de DFD</h4>
+        <p>Arraste um DFD (PDF ou JSON do LicitaReq) e o ETP é pré-preenchido automaticamente.</p>
+      </div>
+      <div class="welcome-card">
+        <div class="welcome-card-icon" style="background:rgba(16,185,129,.15);color:#10B981">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </div>
+        <h4>11 Incisos Obrigatórios</h4>
+        <p>Wizard guiado com validação em tempo real do score de conformidade legal.</p>
+      </div>
+      <div class="welcome-card">
+        <div class="welcome-card-icon" style="background:rgba(245,158,11,.15);color:#F59E0B">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <h4>PDF Executivo Auditável</h4>
+        <p>Documento de 6 blocos com TAG exclusiva e hash SHA-256 para o LicitaAudit.</p>
+      </div>
+      <div class="welcome-card">
+        <div class="welcome-card-icon" style="background:rgba(139,92,246,.15);color:#8B5CF6">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+        </div>
+        <h4>Salvar / Carregar</h4>
+        <p>Guarde rascunhos em JSON e continue depois exatamente de onde parou.</p>
+      </div>
+    </div>
+
+    <div class="modal-welcome-footer">
+      <label class="chk-inline">
+        <input type="checkbox" id="welcomeDontShow" />
+        <span>Não me mostrar novamente</span>
+      </label>
+      <button class="btn btn-accent" onclick="fecharWelcome()">Começar agora →</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ MODAL: IMPORTAR DFD ============================ -->
+<div class="modal-overlay" id="dfdModal" aria-hidden="true">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dfdTitle">
+    <div class="modal-head">
+      <div>
+        <span class="badge badge-inciso">Importação</span>
+        <h2 class="modal-title" id="dfdTitle">Importar DFD (PDF ou JSON)</h2>
+        <p class="modal-subtitle">Carregue o Documento de Formalização da Demanda e o ETP será preenchido automaticamente.</p>
+      </div>
+      <button class="btn-icon-close" onclick="fecharImportarDFD()" aria-label="Fechar">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="dropzone dropzone-lg" id="dfdDropzone">
+      <input type="file" id="dfdFile" accept=".pdf,.json,application/pdf,application/json" hidden />
+      <div class="dropzone-empty">
+        <div class="dropzone-icon">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v13"/><polyline points="7 11 12 16 17 11"/><path d="M5 21h14"/>
+          </svg>
+        </div>
+        <p class="dropzone-title">Arraste o arquivo do DFD aqui</p>
+        <p class="dropzone-hint">ou <strong>clique para selecionar</strong> · aceita <b>PDF</b> e <b>JSON</b></p>
+      </div>
+    </div>
+
+    <div id="dfdResult" class="dfd-result hidden">
+      <div class="dfd-result-head">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ok)"><path d="M20 6L9 17l-5-5"/></svg>
+        <strong id="dfdResultMsg">Campos identificados com sucesso</strong>
+      </div>
+      <ul class="dfd-result-list" id="dfdResultList"></ul>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-ghost" onclick="fecharImportarDFD()">Cancelar</button>
+      <button class="btn btn-accent" id="dfdApplyBtn" onclick="aplicarImportacaoDFD()" disabled>Aplicar ao ETP</button>
+    </div>
+  </div>
 </div>
 
 <div id="toast" class="toast"></div>
