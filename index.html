@@ -12,6 +12,15 @@
 <link id="favicon" rel="icon" type="image/svg+xml"
   href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2310B981'/%3E%3Cstop offset='1' stop-color='%23059669'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='43' font-family='ui-sans-serif,system-ui,sans-serif' font-size='26' font-weight='900' fill='%23FFFFFF' text-anchor='middle' letter-spacing='0.5'%3EETP%3C/text%3E%3C/svg%3E" />
 
+<!-- Tailwind (utilities only — preflight desligado para não sobrescrever tokens) -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    corePlugins: { preflight: false },
+    theme: { extend: { screens: { xs: '481px' } } }
+  };
+</script>
+
 <!-- pdfMake -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
@@ -25,7 +34,8 @@
 
 <!-- ============================ HEADER ============================ -->
 <header class="app-header">
-  <div class="app-header-inner">
+  <div class="app-header-inner max-w-[1480px] mx-auto px-3 sm:px-4 lg:px-6 py-3
+              flex items-center justify-between gap-3 sm:gap-4 flex-wrap">
     <div class="brand">
       <div class="brand-logo" id="brandLogo"></div>
       <div class="brand-text">
@@ -73,10 +83,12 @@
   </div>
 </header>
 
-<div class="app-layout">
+<div class="app-layout max-w-[1480px] mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-6
+            grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]
+            gap-3 sm:gap-4 lg:gap-6">
 
   <!-- ============================ SIDEBAR ============================ -->
-  <aside class="sidebar">
+  <aside class="sidebar min-w-0">
     <div class="card sidebar-card">
       <div class="sidebar-top">
         <div class="sidebar-row">
@@ -92,7 +104,7 @@
   </aside>
 
   <!-- ============================ MAIN ============================ -->
-  <main class="main-area">
+  <main class="main-area min-w-0">
     <div class="card main-card">
 
       <!-- ---------- 0 · IDENTIFICAÇÃO ---------- -->
@@ -121,8 +133,8 @@
           </div>
         </div>
 
-        <div class="grid grid-3">
-          <div class="col-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <div class="sm:col-span-2">
             <label class="lbl">Órgão / Entidade</label>
             <input id="orgao" class="inp" placeholder="Ex.: Tribunal Regional Federal da 1ª Região" />
           </div>
@@ -130,7 +142,7 @@
             <label class="lbl">UASG / Código</label>
             <input id="uasg" class="inp" placeholder="Ex.: 123456" />
           </div>
-          <div class="col-2">
+          <div class="sm:col-span-2">
             <label class="lbl">Unidade / Setor Demandante</label>
             <input id="unidade" class="inp" placeholder="Ex.: Coordenação de Tecnologia da Informação" />
           </div>
@@ -153,11 +165,11 @@
             <label class="lbl">Data de Elaboração</label>
             <input id="dataElaboracao" type="date" class="inp" />
           </div>
-          <div class="col-3">
+          <div class="sm:col-span-2 lg:col-span-3">
             <label class="lbl">Objeto da Contratação (resumo)</label>
             <input id="objeto" class="inp" placeholder="Ex.: Aquisição de 120 microcomputadores desktop" />
           </div>
-          <div class="col-2">
+          <div class="sm:col-span-2">
             <label class="lbl">Responsável pela Elaboração</label>
             <input id="responsavel" class="inp" placeholder="Nome completo" />
           </div>
@@ -174,7 +186,7 @@
             <input id="telefone" class="inp" placeholder="(00) 0000-0000" />
           </div>
 
-          <div class="col-3">
+          <div class="sm:col-span-2 lg:col-span-3">
             <label class="lbl">Logotipo Institucional</label>
             <div class="dropzone" id="logoDropzone">
               <input type="file" id="logoFile" accept="image/*" hidden />
@@ -215,7 +227,7 @@
           <label class="lbl">Necessidade / Problema a ser resolvido *</label>
           <textarea id="necessidade" class="ta" placeholder="Descreva o problema público, sua dimensão, o público afetado e o impacto da não contratação."></textarea>
         </div>
-        <div class="grid grid-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div><label class="lbl">Causa-raiz do problema</label><textarea id="causaRaiz" class="ta ta-sm"></textarea></div>
           <div><label class="lbl">Público-alvo / Beneficiários</label><textarea id="publicoAlvo" class="ta ta-sm"></textarea></div>
         </div>
@@ -230,7 +242,7 @@
             <p class="panel-desc">Demonstração da compatibilidade com o PCA e o planejamento estratégico do órgão.</p>
           </div>
         </div>
-        <div class="grid grid-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <div>
             <label class="lbl">Demanda prevista no PCA?</label>
             <select id="pcaPrevisto" class="sel">
@@ -239,7 +251,7 @@
               <option value="Em revisão">Em revisão pelo setor competente</option>
             </select>
           </div>
-          <div class="col-2"><label class="lbl">Item / Código do PCA</label><input id="pcaItem" class="inp" /></div>
+          <div class="sm:col-span-2"><label class="lbl">Item / Código do PCA</label><input id="pcaItem" class="inp" /></div>
         </div>
         <div><label class="lbl">Justificativa do Alinhamento</label><textarea id="pcaJustificativa" class="ta"></textarea></div>
       </section>
@@ -255,7 +267,7 @@
         </div>
         <div>
           <label class="lbl">Critérios de Sustentabilidade Aplicáveis</label>
-          <div class="grid grid-2 checks">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 checks">
             <label class="chk"><input type="checkbox" name="sustent" value="IN nº 01/2010 — SLTI/MPOG"><span>IN nº 01/2010 — SLTI/MPOG</span></label>
             <label class="chk"><input type="checkbox" name="sustent" value="Lei nº 12.305/2010 — PNRS (logística reversa)"><span>PNRS — Logística reversa</span></label>
             <label class="chk"><input type="checkbox" name="sustent" value="Eficiência energética — Procel/INMETRO"><span>Eficiência energética (Procel / INMETRO)</span></label>
@@ -264,7 +276,7 @@
             <label class="chk"><input type="checkbox" name="sustent" value="Outros critérios ambientais"><span>Outros critérios ambientais</span></label>
           </div>
         </div>
-        <div class="grid grid-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div><label class="lbl">Requisitos Técnicos e de Desempenho</label><textarea id="reqTecnicos" class="ta ta-sm"></textarea></div>
           <div><label class="lbl">Requisitos de Habilitação Técnica</label><textarea id="reqHabilitacao" class="ta ta-sm"></textarea></div>
           <div><label class="lbl">Garantia, Assistência Técnica e Manutenção</label><textarea id="reqGarantia" class="ta ta-sm"></textarea></div>
@@ -337,8 +349,8 @@
             <tbody id="tbPreco"></tbody>
           </table>
         </div>
-        <div class="grid grid-3">
-          <div class="col-2"><label class="lbl">Observações sobre a Estimativa</label><textarea id="obsPreco" class="ta ta-sm"></textarea></div>
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+          <div class="lg:col-span-2"><label class="lbl">Observações sobre a Estimativa</label><textarea id="obsPreco" class="ta ta-sm"></textarea></div>
           <div class="total-box">
             <p class="total-box-lbl">Valor Total Estimado</p>
             <p id="valorTotal" class="total-box-value">R$ 0,00</p>
@@ -356,7 +368,7 @@
           </div>
         </div>
         <div><label class="lbl">Descrição Integrada da Solução *</label><textarea id="descricaoSolucao" class="ta"></textarea></div>
-        <div class="grid grid-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div><label class="lbl">Entregas (Deliverables) e Prazos</label><textarea id="entregas" class="ta ta-sm"></textarea></div>
           <div><label class="lbl">Ciclo de Vida e Sustentabilidade</label><textarea id="cicloVida" class="ta ta-sm"></textarea></div>
         </div>
@@ -371,7 +383,7 @@
             <p class="panel-desc">Fundamentação técnica e econômica sobre a divisão do objeto.</p>
           </div>
         </div>
-        <div class="grid grid-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <div>
             <label class="lbl">Haverá parcelamento?</label>
             <select id="parcelar" class="sel">
@@ -380,7 +392,7 @@
               <option value="Parcial">Parcial — apenas itens específicos</option>
             </select>
           </div>
-          <div class="col-2"><label class="lbl">Itens / Lotes Parceláveis</label><input id="itensParcelaveis" class="inp" /></div>
+          <div class="sm:col-span-2"><label class="lbl">Itens / Lotes Parceláveis</label><input id="itensParcelaveis" class="inp" /></div>
         </div>
         <div><label class="lbl">Fundamentação da Decisão</label><textarea id="justificativaParcelamento" class="ta"></textarea></div>
       </section>
@@ -395,7 +407,7 @@
           </div>
         </div>
         <div><label class="lbl">Resultados Esperados *</label><textarea id="resultados" class="ta"></textarea></div>
-        <div class="grid grid-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div><label class="lbl">Ganhos de Economicidade</label><textarea id="economicidade" class="ta ta-sm"></textarea></div>
           <div><label class="lbl">Indicadores de Aferição</label><textarea id="indicadores" class="ta ta-sm"></textarea></div>
         </div>
@@ -410,7 +422,7 @@
             <p class="panel-desc">Ações necessárias antes da contratação e dependências entre contratações.</p>
           </div>
         </div>
-        <div class="grid grid-2">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div><label class="lbl">Providências Prévias ao Certame</label><textarea id="providencias" class="ta"></textarea></div>
           <div><label class="lbl">Contratações Correlatas e Interdependentes</label><textarea id="correlatas" class="ta"></textarea></div>
         </div>
@@ -426,14 +438,14 @@
             <p class="panel-desc">Manifestação técnica conclusiva quanto à adequação e viabilidade da contratação.</p>
           </div>
         </div>
-        <div class="grid grid-3">
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <div>
             <label class="lbl">Posicionamento *</label>
             <select id="posicionamento" class="sel">
               <option>Viável</option><option>Viável com ressalvas</option><option>Inviável</option>
             </select>
           </div>
-          <div class="col-2"><label class="lbl">Recomendações e Condicionantes</label><input id="recomendacoes" class="inp" /></div>
+          <div class="sm:col-span-2"><label class="lbl">Recomendações e Condicionantes</label><input id="recomendacoes" class="inp" /></div>
         </div>
         <div><label class="lbl">Conclusão Técnica Fundamentada *</label><textarea id="conclusao" class="ta"></textarea></div>
       </section>
@@ -453,9 +465,10 @@
 
     </div>
 
-    <div class="nav-bar">
+    <div class="nav-bar flex flex-col-reverse sm:flex-row items-stretch sm:items-center
+                justify-between gap-2 sm:gap-3 mt-4 sm:mt-6">
       <button id="btnVoltar" class="btn btn-ghost" onclick="goTo(current-1)">← Voltar</button>
-      <div class="nav-bar-right">
+      <div class="nav-bar-right flex flex-col sm:flex-row gap-2">
         <button id="btnProximo" class="btn btn-primary" onclick="goTo(current+1)">Próximo →</button>
         <button id="btnGerar" class="btn btn-accent hidden" onclick="gerarPDF()">Gerar PDF do ETP</button>
       </div>
