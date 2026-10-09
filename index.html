@@ -2,12 +2,15 @@
 <html lang="pt-BR" data-theme="light">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>LicitaETP — Estudo Técnico Preliminar | Lei nº 14.133/2021</title>
 
-<!-- Favicon SVG verde -->
+<meta name="theme-color" content="#10B981" media="(prefers-color-scheme: light)" />
+<meta name="theme-color" content="#070B14" media="(prefers-color-scheme: dark)" />
+
+<!-- Favicon SVG verde com letras brancas -->
 <link id="favicon" rel="icon" type="image/svg+xml"
-  href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%2310B981'/%3E%3Ctext x='32' y='43' font-family='system-ui' font-size='26' font-weight='900' fill='%2304140E' text-anchor='middle'%3EETP%3C/text%3E%3C/svg%3E" />
+  href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2310B981'/%3E%3Cstop offset='1' stop-color='%23059669'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='43' font-family='ui-sans-serif,system-ui,sans-serif' font-size='26' font-weight='900' fill='%23FFFFFF' text-anchor='middle' letter-spacing='0.5'%3EETP%3C/text%3E%3C/svg%3E" />
 
 <!-- pdfMake -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
@@ -64,7 +67,7 @@
 
       <button class="btn btn-accent" onclick="gerarPDF()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        Gerar PDF
+        <span>Gerar PDF</span>
       </button>
     </div>
   </div>
@@ -102,7 +105,6 @@
           </div>
         </div>
 
-        <!-- Callout de importação DFD -->
         <div class="dfd-callout" onclick="abrirImportarDFD()" role="button" tabindex="0">
           <div class="dfd-callout-icon">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -111,7 +113,7 @@
           </div>
           <div class="dfd-callout-text">
             <strong>Importar DFD automaticamente</strong>
-            <span>Arraste aqui o JSON (exportado do LicitaReq) ou o PDF oficial do DFD — os campos serão preenchidos automaticamente.</span>
+            <span>Arraste o JSON (do LicitaReq) ou o PDF oficial do DFD — os campos serão preenchidos automaticamente.</span>
           </div>
           <div class="dfd-callout-action">
             <span class="dfd-chip">PDF</span>
@@ -137,7 +139,7 @@
             <input id="exercicio" class="inp" placeholder="2026" />
           </div>
           <div>
-            <label class="lbl">Nº do ETP <span class="hint">(gerado automaticamente)</span></label>
+            <label class="lbl">Nº do ETP <span class="hint">(automático)</span></label>
             <div class="inp-with-prefix">
               <span class="prefix">ETP</span>
               <input id="numeroEtp" class="inp inp-prefixed" placeholder="001" />
@@ -172,7 +174,6 @@
             <input id="telefone" class="inp" placeholder="(00) 0000-0000" />
           </div>
 
-          <!-- Dropzone de logotipo -->
           <div class="col-3">
             <label class="lbl">Logotipo Institucional</label>
             <div class="dropzone" id="logoDropzone">
@@ -462,12 +463,12 @@
   </main>
 </div>
 
-<!-- ============================ MODAL: WELCOME / TUTORIAL ============================ -->
+<!-- ============================ MODAL: WELCOME ============================ -->
 <div class="modal-overlay" id="welcomeModal" aria-hidden="true">
   <div class="modal modal-welcome" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
     <div class="modal-welcome-hero">
       <div class="modal-welcome-logo" id="welcomeLogo"></div>
-      <span class="modal-welcome-badge">LicitaETP v2.0</span>
+      <span class="modal-welcome-badge">LicitaETP v2.1</span>
     </div>
     <h2 class="modal-title" id="welcomeTitle">Bem-vindo ao LicitaETP</h2>
     <p class="modal-subtitle">
