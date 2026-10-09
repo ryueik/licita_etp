@@ -1,7 +1,8 @@
 /* =====================================================================
-   LICITAETP v2.5 — NÚCLEO COMPLETO
+   LICITAETP v2.5.1 — NÚCLEO COMPLETO
    Estudo Técnico Preliminar · Lei nº 14.133/2021
-   Parser DFD posicional + Captura de Logo do PDF + Delimitação Estrita
+   Parser DFD posicional + Captura de Logo + Delimitação Estrita
+   + Anti-paginação (defesa em profundidade: parser → cleanValue → render)
    ===================================================================== */
 'use strict';
 
@@ -160,8 +161,8 @@ function abrirAjuda(){
 /* =====================================================================
    5. ESTADO GLOBAL
    ===================================================================== */
-let logoDataUrl   = null;   // dataURL do logotipo ativo (do DFD, upload manual ou rascunho)
-let logoOrigem    = 'default'; // 'default' | 'dfd' | 'manual' | 'rascunho'
+let logoDataUrl   = null;
+let logoOrigem    = 'default';
 let logoPadraoPng = null;
 let current = 0;
 let panels = [];
@@ -459,12 +460,18 @@ function ehLabelVisual(valor){
   return LABELS_BLACKLIST.has(v);
 }
 
-/* ---------- 10.2 · CLEAN VALUE ---------- */
+/* ---------- 10.2 · CLEAN VALUE (v2.5.1 — anti-paginação) ---------- */
 function cleanValue(text){
   if (text == null) return '';
   let v = String(text);
   v = v.replace(/\r/g, '\n').replace(/\n+/g, ' ').replace(/\t/g, ' ');
   v = v.replace(/\s{2,}/g, ' ');
+
+  /* ---------- v2.5.1 · ANTI-PAGINAÇÃO (source) ---------- */
+  v = v.replace(/\b(?:P[áa]gina|Page)\s+\d+\s*(?:de|of|\/)\s*\d+\b/gi, ' ');
+  v = v.replace(/[\[\]·•\-–—]*\s*(?:P[áa]gina|Page)\s+\d+\s*(?:de|of|\/)\s*\d+\s*[\[\]·•\-–—]*/gi, ' ');
+  v = v.replace(/^\s*\d+\s*(?:de|\/)\s*\d+\s*$/gm, ' ');
+
   v = v.replace(/^[\s:;\-–—_\/|>»•·●◦‣▪►]+/, '');
   v = v.replace(/[\s:;\-–—_\/|]+$/, '');
 
@@ -519,6 +526,10 @@ function sanitizarTextoPDF(txt){
   t = t.replace(/^[-–—_=]{3,}\s*$/gm, '');
   t = t.replace(/Documento\s+gerado\s+eletronicamente[^\n]*/gi, '');
   t = t.replace(/Emitido\s+em[^\n]*/gi, '');
+
+  /* v2.5.1 · paginação inline (meio de frase) */
+  t = t.replace(/\b(?:P[áa]gina|Page)\s+\d+\s*(?:de|of|\/)\s*\d+\b/gi, ' ');
+  t = t.replace(/[\[\]·•\-–—]*\s*(?:P[áa]gina|Page)\s+\d+\s*(?:de|of|\/)\s*\d+\s*[\[\]·•\-–—]*/gi, ' ');
 
   t = t.replace(/CARGO\s*\/\s*\n\s*FUN[ÇC][ÃA]O/gi, 'CARGO / FUNÇÃO');
   t = t.replace(/RESPONS[ÁA]VEL\s*\n\s*PELA\s+DEMANDA/gi, 'RESPONSÁVEL PELA DEMANDA');
@@ -611,7 +622,7 @@ function normalizarMoeda(v){
 }
 
 /* =====================================================================
-   10.7 · EXTRAÇÃO DE IMAGENS (LOGO) DO PDF — v2.5
+   10.7 · EXTRAÇÃO DE IMAGENS (LOGO) DO PDF
    ===================================================================== */
 async function extrairLogoDoPdf(file){
   if (!window.pdfjsLib) return null;
@@ -749,11 +760,8 @@ function bitmapParaDataUrl(imgObj){
    10.8 · CONSTRUÇÃO DA GRADE DE CÉLULAS (TABELA-AWARE)
    ===================================================================== */
 
-/* ---------- 10.8.1 · LABELS UNIVERSAIS DE PARADA ----------
-   Qualquer bloco de texto (objeto, justificativa, etc.) PARA imediatamente
-   ao encontrar uma destas linhas. Impede vazamento entre seções do DFD. */
+/* ---------- 10.8.1 · LABELS UNIVERSAIS DE PARADA ---------- */
 const STOP_LABELS_UNIVERSAL_RAW = [
-  /* --- Seções típicas do DFD/ETP --- */
   'Justificativa da Necessidade',
   'Justificativa da Necessidade Pública',
   'Justificativa da Necessidade Pública (Fundamentada)',
@@ -787,8 +795,6 @@ const STOP_LABELS_UNIVERSAL_RAW = [
   'Providências Prévias e Contratações Correlatas',
   'Posicionamento Conclusivo',
   'Posicionamento Conclusivo sobre a Viabilidade',
-
-  /* --- Campos de identificação (bloqueiam qualquer bloco) --- */
   'Órgão / Entidade',
   'Órgão/Entidade',
   'Órgão Entidade',
@@ -1204,7 +1210,6 @@ function extrairCamposDFD(texto, paginas){
     justificativa:'', processo:'', orgao:'', uasg:''
   };
 
-  /* ---------- Campos simples: posicionais primeiro ---------- */
   campos.orgao = extrairCampo(celulas, [
     'Órgão / Entidade','Órgão/Entidade','Órgão Entidade','Órgão','Entidade'
   ]) || '';
@@ -1241,7 +1246,6 @@ function extrairCamposDFD(texto, paginas){
   ]) || '';
   if (campos.processo && !/\d/.test(campos.processo)) campos.processo = '';
 
-  /* ---------- Valor estimado ---------- */
   let valorTxt = extrairCampo(celulas, [
     'Valor Estimado da Contratação','Valor Estimado da Contratacao',
     'Valor Total Estimado','Valor Estimado','Valor Global',
@@ -1261,7 +1265,6 @@ function extrairCamposDFD(texto, paginas){
   }
   campos.valor = normalizarMoeda(valorTxt);
 
-  /* ---------- E-mail / Telefone ---------- */
   {
     const m = t.match(/([\w._%+\-]+@[\w.\-]+\.[A-Za-z]{2,})/);
     if (m) campos.email = cleanValue(m[1]);
@@ -1271,7 +1274,6 @@ function extrairCamposDFD(texto, paginas){
     if (m) campos.telefone = cleanValue(m[1]);
   }
 
-  /* ---------- Nº do DFD ---------- */
   {
     let m = t.match(/(?:N[º°º]?\s*(?:do\s*)?DFD|DFD\s*n?[º°º]?)\s*[:\-–—]?\s*(\d{1,6}\s*\/\s*\d{2,4})/i);
     if (!m) m = t.match(/\bDFD\s+(\d{1,6}\s*\/\s*\d{2,4})/i);
@@ -1439,6 +1441,16 @@ function extrairCamposDFD(texto, paginas){
     campos.unidade = campos.unidade.slice(campos.orgao.length).replace(/^[\s\-–—:]+/, '');
   }
 
+  /* ---------- v2.5.1 · Sanitização anti-paginação (defesa em profundidade) ---------- */
+  ['objeto', 'justificativa', 'unidade', 'orgao', 'responsavel', 'cargo'].forEach(k => {
+    if (typeof campos[k] === 'string' && campos[k]){
+      campos[k] = campos[k]
+        .replace(/[\[\]·•\-–—]*\s*(?:P[áa]gina|Page)\s+\d+\s*(?:de|of|\/)\s*\d+\s*[\[\]·•\-–—]*/gi, ' ')
+        .replace(/\s{2,}/g, ' ')
+        .trim();
+    }
+  });
+
   Object.keys(campos).forEach(k => {
     if (typeof campos[k] === 'string') campos[k] = cleanValue(campos[k]);
   });
@@ -1560,14 +1572,39 @@ function aplicarLogoCapturada(dataUrl, origem = 'dfd'){
 }
 
 /* =====================================================================
+   10.12 · SANITIZAÇÃO FINAL (RENDER) — v2.5.1 defesa em profundidade
+   =====================================================================
+   Remove artefatos de paginação que possam ter escapado do parser:
+   "Página 1 de 8", "Page 1 of 8", "[Página 1 de 8]", "· Página 1 de 8 ·".
+   Aplicada antes de qualquer texto entrar no pdfMake.
+   ===================================================================== */
+function sanitizarTextoRender(s){
+  if (s == null) return '';
+  let t = String(s);
+
+  /* Formatos completos (com ou sem brackets/bullets) */
+  t = t.replace(/[\[\]·•\-–—]*\s*(?:P[áa]gina|Page)\s+\d+\s*(?:de|of|\/)\s*\d+\s*[\[\]·•\-–—]*/gi, ' ');
+
+  /* Formato "N de M" ou "N / M" isolado em linha (fallback) */
+  t = t.replace(/^\s*\d+\s*(?:de|\/)\s*\d+\s*$/gm, ' ');
+
+  /* Recolhe espaços e limpa pontuação órfã nas bordas */
+  t = t.replace(/\s{2,}/g, ' ').trim();
+  t = t.replace(/^[\s:;\-–—,\.]+|[\s:;\-–—,\.]+$/g, '').trim();
+
+  return t;
+}
+
+/* =====================================================================
    11. HELPERS PDF
    ===================================================================== */
 const BRAND = '#0F2F5B', BRAND2 = '#1E6F5C', MUTED = '#64748B', LINEC = '#CBD5E1';
 const PAGE_MARGINS = [40, 45, 40, 50];
 
 function txtBloco(t){
-  if (!t || !String(t).trim()) return [{ text:'— não informado —', italics:true, color:'#94A3B8', fontSize:9.5 }];
-  const lines = String(t).split('\n').map(l => l.trim()).filter(Boolean);
+  const limpo = sanitizarTextoRender(t);
+  if (!limpo || !limpo.trim()) return [{ text:'— não informado —', italics:true, color:'#94A3B8', fontSize:9.5 }];
+  const lines = String(limpo).split('\n').map(l => sanitizarTextoRender(l)).filter(Boolean);
   const out = []; let ul = [];
   const flush = () => { if (ul.length){ out.push({ ul, fontSize:9.5, lineHeight:1.3, margin:[0,0,0,6], color:'#1E293B' }); ul = []; } };
   lines.forEach(l => {
@@ -1595,8 +1632,8 @@ function tabelaDados(header, rows, widths){
     table: {
       headerRows: 1, widths,
       body: [
-        header.map(h => ({ text:h, bold:true, fontSize:7.5, color:'#FFFFFF', fillColor:BRAND2, margin:[4,5,4,5] })),
-        ...rows.map(r => r.map(c => ({ text:String(c ?? ''), fontSize:8.5, color:'#1E293B', margin:[4,4,4,4] })))
+        header.map(h => ({ text: sanitizarTextoRender(h), bold:true, fontSize:7.5, color:'#FFFFFF', fillColor:BRAND2, margin:[4,5,4,5] })),
+        ...rows.map(r => r.map(c => ({ text: sanitizarTextoRender(String(c ?? '')), fontSize:8.5, color:'#1E293B', margin:[4,4,4,4] })))
       ]
     },
     layout: { hLineWidth:()=>0.5, vLineWidth:()=>0.5, hLineColor:()=>LINEC, vLineColor:()=>LINEC,
@@ -1622,22 +1659,26 @@ const dataBR = iso => { if (!iso) return new Date().toLocaleDateString('pt-BR');
 function blocoCapa(d, conf, meta){
   const logoImg = logoDataUrl || logoPadraoPng;
   const logo = logoImg ? { image: logoImg, width: 78, alignment: 'center', margin: [0, 0, 0, 14] } : { text: '', margin: [0, 0, 0, 6] };
+
+  /* v2.5.1 · Sanitização final dos valores exibidos na capa */
+  const objetoLimpo = sanitizarTextoRender(d.id.objeto);
+
   const resumo = [
-    ['Nº do ETP',             `${d.id.numero || '—'} / ${d.id.exercicio || '—'}`],
-    ['Processo',              d.id.processo || '—'],
-    ['Órgão / Unidade',       `${d.id.orgao || '—'}${d.id.unidade ? ' — ' + d.id.unidade : ''}`],
-    ['Objeto',                d.id.objeto || '—'],
-    ['Responsável técnico',   `${d.id.responsavel || '—'}${d.id.cargo ? ' — ' + d.id.cargo : ''}`],
+    ['Nº do ETP',             `${sanitizarTextoRender(d.id.numero) || '—'} / ${sanitizarTextoRender(d.id.exercicio) || '—'}`],
+    ['Processo',              sanitizarTextoRender(d.id.processo) || '—'],
+    ['Órgão / Unidade',       `${sanitizarTextoRender(d.id.orgao) || '—'}${d.id.unidade ? ' — ' + sanitizarTextoRender(d.id.unidade) : ''}`],
+    ['Objeto',                objetoLimpo || '—'],
+    ['Responsável técnico',   `${sanitizarTextoRender(d.id.responsavel) || '—'}${d.id.cargo ? ' — ' + sanitizarTextoRender(d.id.cargo) : ''}`],
     ['Valor total estimado',  moeda(d.precos.total)],
-    ['Posicionamento',        d.conc.posicionamento || '—'],
+    ['Posicionamento',        sanitizarTextoRender(d.conc.posicionamento) || '—'],
     ['Score de conformidade', `${conf.score}% (${conf.linhas.filter(l => l.pct === 100).length}/${conf.linhas.length} incisos atendidos)`]
   ];
   return {
     stack: [
       { text:'', margin:[0,20,0,0] }, logo,
-      { text: (d.id.orgao || 'ÓRGÃO / ENTIDADE').toUpperCase(), alignment:'center', bold:true, fontSize:13, color:BRAND, characterSpacing:0.5 },
-      { text: d.id.unidade || '', alignment:'center', fontSize:9, color:MUTED, margin:[0,3,0,0] },
-      { text: d.id.uasg ? `UASG ${d.id.uasg}` : '', alignment:'center', fontSize:8, color:MUTED, margin:[0,2,0,0] },
+      { text: sanitizarTextoRender((d.id.orgao || 'ÓRGÃO / ENTIDADE').toUpperCase()), alignment:'center', bold:true, fontSize:13, color:BRAND, characterSpacing:0.5 },
+      { text: sanitizarTextoRender(d.id.unidade || ''), alignment:'center', fontSize:9, color:MUTED, margin:[0,3,0,0] },
+      { text: d.id.uasg ? `UASG ${sanitizarTextoRender(d.id.uasg)}` : '', alignment:'center', fontSize:8, color:MUTED, margin:[0,2,0,0] },
       { canvas: [{ type:'line', x1:150, y1:0, x2:365, y2:0, lineWidth:1.1, lineColor:BRAND2 }], margin:[0,12,0,16] },
       { text:'ESTUDO TÉCNICO PRELIMINAR', alignment:'center', bold:true, fontSize:19, color:BRAND, characterSpacing:1.2 },
       { text:'E T P', alignment:'center', bold:true, fontSize:11, color:BRAND2, characterSpacing:6, margin:[0,3,0,0] },
@@ -1682,14 +1723,15 @@ function blocoNota(d){
                paddingLeft:()=>0, paddingRight:()=>0, paddingTop:()=>0, paddingBottom:()=>0 } },
     { text:'', margin:[0,18,0,0] },
     { canvas: [{ type:'line', x1:60, y1:0, x2:455, y2:0, lineWidth:0.6, lineColor:LINEC }] },
-    { text:`Processo administrativo nº ${d.id.processo || '—'} · ETP nº ${d.id.numero || '—'}/${d.id.exercicio || '—'}`,
+    { text:`Processo administrativo nº ${sanitizarTextoRender(d.id.processo) || '—'} · ETP nº ${sanitizarTextoRender(d.id.numero) || '—'}/${sanitizarTextoRender(d.id.exercicio) || '—'}`,
       alignment:'center', fontSize:8, color:MUTED, margin:[0,10,0,0] }
   ], pageBreak: 'after' };
 }
 
 function blocoConformidade(d, conf, meta){
   const linhas = conf.linhas.map(l => [
-    { text:l.n, bold:true, alignment:'center' }, l.t,
+    { text:l.n, bold:true, alignment:'center' },
+    { text: sanitizarTextoRender(l.t) },
     { text:l.status, bold:true, color:l.cor, fillColor:l.bg, alignment:'center' },
     { text:`${l.pct}%`, alignment:'center', bold:true, color:l.cor }
   ]);
@@ -1752,10 +1794,18 @@ function blocoCorpo(d){
       campo('Conclusão do levantamento de mercado', d.mercado.conclusao)
     ]),
     secao('VI', 'ESTIMATIVA PRELIMINAR DE PREÇOS', [
-      campo('Método de estimativa adotado', d.precos.metodo),
-      tabelaDados(['ITEM','FONTE / FORNECEDOR','VALOR UNIT.','QTD.','TOTAL'],
-        d.precos.itens.map(i => [i.item, i.fonte, moeda(i.unitario), i.quantidade, moeda(i.total)]),
-        ['*','*',70,40,75]),
+      campo('Método de estimativa adotado', sanitizarTextoRender(d.precos.metodo)),
+      tabelaDados(
+        ['ITEM / FONTE', 'DESCRIÇÃO / FORNECEDOR', 'VALOR UNIT.', 'QTD.', 'TOTAL'],
+        d.precos.itens.map(i => [
+          sanitizarTextoRender(i.item)  || '—',
+          sanitizarTextoRender(i.fonte) || '—',
+          moeda(i.unitario),
+          sanitizarTextoRender(i.quantidade),
+          moeda(i.total)
+        ]),
+        ['*','*',70,40,75]
+      ),
       { table: { widths:['*',150], body: [[
         { text:'VALOR TOTAL ESTIMADO DA CONTRATAÇÃO', bold:true, fontSize:9, color:BRAND, margin:[8,8,8,8], fillColor:'#F0FDF4' },
         { text: moeda(d.precos.total), bold:true, fontSize:11, color:'#15803D', alignment:'right', margin:[8,7,8,7], fillColor:'#F0FDF4' }
@@ -1799,12 +1849,12 @@ function blocoAprovacao(d){
     const par = lista.slice(i, i + 2);
     const cells = par.map(a => ({
       stack: [
-        { text:(a.papel || 'AGENTE').toUpperCase(), fontSize:7.5, bold:true, color:BRAND2, characterSpacing:0.6, margin:[0,0,0,26] },
+        { text:(sanitizarTextoRender(a.papel) || 'AGENTE').toUpperCase(), fontSize:7.5, bold:true, color:BRAND2, characterSpacing:0.6, margin:[0,0,0,26] },
         { canvas:[{ type:'line', x1:0, y1:0, x2:215, y2:0, lineWidth:0.8, lineColor:'#94A3B8' }] },
-        { text:a.nome || '—', bold:true, fontSize:9, color:'#0F172A', margin:[0,5,0,0] },
-        { text:a.cargo || '—', fontSize:8, color:'#475569', margin:[0,1,0,0] },
-        { text:a.orgao || '—', fontSize:7.5, color:MUTED, margin:[0,1,0,0] },
-        a.matricula ? { text:`Matrícula: ${a.matricula}`, fontSize:7, color:'#94A3B8', margin:[0,2,0,0] } : { text:'' },
+        { text: sanitizarTextoRender(a.nome) || '—', bold:true, fontSize:9, color:'#0F172A', margin:[0,5,0,0] },
+        { text: sanitizarTextoRender(a.cargo) || '—', fontSize:8, color:'#475569', margin:[0,1,0,0] },
+        { text: sanitizarTextoRender(a.orgao) || '—', fontSize:7.5, color:MUTED, margin:[0,1,0,0] },
+        a.matricula ? { text:`Matrícula: ${sanitizarTextoRender(a.matricula)}`, fontSize:7, color:'#94A3B8', margin:[0,2,0,0] } : { text:'' },
         { text:'Assinatura / Carimbo', fontSize:6.5, italics:true, color:'#94A3B8', margin:[0,4,0,0] }
       ], margin:[0,6,12,20]
     }));
@@ -1823,7 +1873,7 @@ function blocoAprovacao(d){
     ], margin:[12,11,12,11] }]] },
       layout:{ hLineWidth:()=>0.5, vLineWidth:()=>0.5, hLineColor:()=>LINEC, vLineColor:()=>LINEC,
                paddingLeft:()=>0, paddingRight:()=>0, paddingTop:()=>0, paddingBottom:()=>0 } },
-    { text:`${d.id.unidade || ''}${d.id.unidade && d.id.orgao ? ' — ' : ''}${d.id.orgao || ''}, ${dataBR(d.id.data)}.`,
+    { text:`${sanitizarTextoRender(d.id.unidade) || ''}${d.id.unidade && d.id.orgao ? ' — ' : ''}${sanitizarTextoRender(d.id.orgao) || ''}, ${dataBR(d.id.data)}.`,
       alignment:'right', fontSize:9, color:'#334155', margin:[0,22,0,0] }
   ], pageBreak:'before' };
 }
@@ -1847,11 +1897,11 @@ function blocoAutenticacao(d, meta){
         [{ text:'EMITIDO EM', fontSize:6.8, bold:true, color:MUTED, alignment:'center', margin:[0,4,0,2] },
          { text:'EXERCÍCIO', fontSize:6.8, bold:true, color:MUTED, alignment:'center', margin:[0,4,0,2] }],
         [{ text:meta.emitidoEm, fontSize:8.5, bold:true, color:'#0F172A', alignment:'center', margin:[0,2,0,6] },
-         { text:`${d.id.exercicio || '—'}`, fontSize:8.5, bold:true, color:'#0F172A', alignment:'center', margin:[0,2,0,6] }],
+         { text:`${sanitizarTextoRender(d.id.exercicio) || '—'}`, fontSize:8.5, bold:true, color:'#0F172A', alignment:'center', margin:[0,2,0,6] }],
         [{ text:'Nº DO ETP', fontSize:6.8, bold:true, color:MUTED, alignment:'center', margin:[0,4,0,2] },
          { text:'PROCESSO', fontSize:6.8, bold:true, color:MUTED, alignment:'center', margin:[0,4,0,2] }],
-        [{ text:`${d.id.numero || '—'}/${d.id.exercicio || '—'}`, fontSize:8.5, bold:true, color:'#0F172A', alignment:'center', margin:[0,2,0,6] },
-         { text:d.id.processo || '—', fontSize:8.5, bold:true, color:'#0F172A', alignment:'center', margin:[0,2,0,6] }]
+        [{ text:`${sanitizarTextoRender(d.id.numero) || '—'}/${sanitizarTextoRender(d.id.exercicio) || '—'}`, fontSize:8.5, bold:true, color:'#0F172A', alignment:'center', margin:[0,2,0,6] },
+         { text: sanitizarTextoRender(d.id.processo) || '—', fontSize:8.5, bold:true, color:'#0F172A', alignment:'center', margin:[0,2,0,6] }]
       ]}, layout:{ hLineWidth:()=>0.4, vLineWidth:()=>0.4, hLineColor:()=>'#E2E8F0', vLineColor:()=>'#E2E8F0',
                    paddingLeft:()=>0, paddingRight:()=>0, paddingTop:()=>0, paddingBottom:()=>0 } }
     ], margin:[22,20,22,20] }]] }, layout: caixaLayout },
@@ -1885,15 +1935,15 @@ function montarDocumento(d, conf, meta){
       author: d.id.orgao || 'LicitaETP',
       subject: 'ETP — Lei nº 14.133/2021, art. 18, § 1º',
       keywords: `ETP, Licitações, Lei 14.133/2021, ${meta.tag}`,
-      creator: 'LicitaETP v2.5'
+      creator: 'LicitaETP v2.5.1'
     },
     header: (cp, total) => {
       if (cp <= 3 || cp === total) return null;
       return {
         margin: [40, 18, 40, 0],
         columns: [
-          { text: (d.id.orgao || '').toUpperCase(), fontSize:7, color:'#94A3B8', bold:true },
-          { text: `ETP nº ${d.id.numero || '—'}/${d.id.exercicio || '—'}`, fontSize:7, color:'#94A3B8', alignment:'right' }
+          { text: sanitizarTextoRender((d.id.orgao || '').toUpperCase()), fontSize:7, color:'#94A3B8', bold:true },
+          { text: `ETP nº ${sanitizarTextoRender(d.id.numero) || '—'}/${sanitizarTextoRender(d.id.exercicio) || '—'}`, fontSize:7, color:'#94A3B8', alignment:'right' }
         ]
       };
     },
@@ -1996,7 +2046,7 @@ async function exportarJSON(){
   const emitidoEm = new Date().toISOString();
   const hash = await sha256Hex(JSON.stringify({ etp:d, tag, emitidoEm }));
   const pacote = {
-    sistema:'LicitaETP', versao:'2.5.0', trilha:'LICITAETP', tipo:'auditoria',
+    sistema:'LicitaETP', versao:'2.5.1', trilha:'LICITAETP', tipo:'auditoria',
     tag, hash, emitidoEm,
     logo: logoDataUrl,
     logoOrigem,
@@ -2018,7 +2068,7 @@ async function exportarJSON(){
 function salvarRascunho(){
   try {
     const pacote = {
-      sistema:'LicitaETP', versao:'2.5.0', tipo:'rascunho',
+      sistema:'LicitaETP', versao:'2.5.1', tipo:'rascunho',
       salvoEm: new Date().toISOString(),
       logo: logoDataUrl,
       logoOrigem,
@@ -2275,5 +2325,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /* =====================================================================
-   FIM — LicitaETP v2.5
+   FIM — LicitaETP v2.5.1
    ===================================================================== */
