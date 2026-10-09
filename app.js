@@ -1,7 +1,7 @@
 /* =====================================================================
-   LICITAETP v2.3 — NÚCLEO COMPLETO
+   LICITAETP v2.4 — NÚCLEO COMPLETO
    Estudo Técnico Preliminar · Lei nº 14.133/2021
-   Parser DFD: rótulos exatos · cleanValue · anti-falso-positivo
+   Parser DFD robusto + Captura de Logo institucional do PDF
    ===================================================================== */
 'use strict';
 
@@ -160,7 +160,8 @@ function abrirAjuda(){
 /* =====================================================================
    5. ESTADO GLOBAL
    ===================================================================== */
-let logoDataUrl   = null;
+let logoDataUrl   = null;   // dataURL do logotipo ativo (do DFD, upload manual ou rascunho)
+let logoOrigem    = 'default'; // 'default' | 'dfd' | 'manual' | 'rascunho'
 let logoPadraoPng = null;
 let current = 0;
 let panels = [];
@@ -395,87 +396,62 @@ function calcularConformidade(d){
 }
 
 /* =====================================================================
-   10.1 · BLACKLIST DE RÓTULOS VISUAIS
+   10. IMPORTAÇÃO DE DFD — PARSER + CAPTURA DE LOGO
    ===================================================================== */
 
-/** Lista bruta de rótulos que NUNCA podem ser tratados como valor. */
+/* ---------- 10.1 · BLACKLIST DE RÓTULOS VISUAIS ---------- */
 const LABELS_BLACKLIST_RAW = [
-  /* ---- Cabeçalhos institucionais ---- */
-  'ÓRGÃO / ENTIDADE', 'ÓRGÃO ENTIDADE', 'ÓRGÃO/ENTIDADE',
-  'ÓRGÃO', 'ENTIDADE',
-  'UASG / CÓDIGO', 'UASG/CÓDIGO', 'UASG',
-  'UNIDADE / SETOR DEMANDANTE', 'UNIDADE / SETOR',
-  'UNIDADE REQUISITANTE', 'UNIDADE DEMANDANTE',
-  'SETOR REQUISITANTE', 'SETOR DEMANDANTE',
-  'UNIDADE SOLICITANTE', 'SETOR SOLICITANTE',
-  'UNIDADE', 'SETOR',
-
-  /* ---- Identificação ---- */
-  'EXERCÍCIO', 'EXERCICIO',
-  'Nº DO ETP', 'NÚMERO DO ETP', 'NUMERO DO ETP',
-  'Nº', 'NÚMERO', 'NUMERO',
-  'PROCESSO ADMINISTRATIVO', 'PROCESSO',
-  'Nº DO PROCESSO', 'NÚMERO DO PROCESSO', 'NUMERO DO PROCESSO',
-  'DATA DE ELABORAÇÃO', 'DATA DE ELABORACAO', 'DATA',
-
-  /* ---- Conteúdo ---- */
-  'OBJETO DA CONTRATAÇÃO', 'OBJETO DA CONTRATACAO',
-  'OBJETO DA DEMANDA', 'OBJETO',
-  'DESCRIÇÃO RESUMIDA DO OBJETO', 'DESCRIÇÃO DO OBJETO', 'DESCRIÇÃO',
-  'JUSTIFICATIVA DA NECESSIDADE', 'JUSTIFICATIVA DA DEMANDA',
-  'JUSTIFICATIVA', 'NECESSIDADE', 'MOTIVAÇÃO',
-
-  /* ---- Responsáveis ---- */
-  'RESPONSÁVEL PELA ELABORAÇÃO', 'RESPONSÁVEL PELA DEMANDA',
-  'RESPONSÁVEL DA DEMANDA', 'RESPONSÁVEL TÉCNICO',
-  'RESPONSÁVEL', 'SOLICITANTE', 'ELABORADOR',
-  'CARGO / FUNÇÃO', 'CARGO/FUNÇÃO', 'CARGO E FUNÇÃO', 'CARGO OU FUNÇÃO',
-  'CARGO', 'FUNÇÃO', 'FUNCAO',
-
-  /* ---- Contato ---- */
-  'E-MAIL INSTITUCIONAL', 'E-MAIL', 'EMAIL',
-  'TELEFONE', 'TEL', 'FONE', 'RAMAL',
-  'LOGOTIPO INSTITUCIONAL', 'LOGOTIPO', 'LOGO',
-
-  /* ---- Preços ---- */
-  'VALOR ESTIMADO DA CONTRATAÇÃO', 'VALOR ESTIMADO DA CONTRATACAO',
-  'VALOR TOTAL ESTIMADO', 'VALOR ESTIMADO',
-  'VALOR GLOBAL', 'VALOR TOTAL', 'VALOR',
-
-  /* ---- DFD ---- */
-  'DFD', 'Nº DO DFD', 'NÚMERO DO DFD', 'NUMERO DO DFD',
-  'DOCUMENTO DE FORMALIZAÇÃO DA DEMANDA',
-  'DOCUMENTO DE FORMALIZACAO DA DEMANDA',
-
-  /* ---- Placeholders vazios ---- */
-  'NÃO INFORMADO', 'NÃO INFORMADA', 'NÃO SE APLICA',
-  'N/A', 'N/D', 'ND', 'NA',
-  '-', '--', '---', '—', '–', '...',
-
-  /* ---- Palavras soltas que vazam ---- */
-  'DEMANDA', 'SOLICITAÇÃO', 'SOLICITACAO',
-  'TÉCNICO', 'TECNICO', 'PELA', 'PELO',
-  'ELABORAÇÃO', 'ELABORACAO'
+  'ÓRGÃO / ENTIDADE','ÓRGÃO ENTIDADE','ÓRGÃO/ENTIDADE','ÓRGÃO','ENTIDADE',
+  'UASG / CÓDIGO','UASG/CÓDIGO','UASG',
+  'UNIDADE / SETOR DEMANDANTE','UNIDADE / SETOR',
+  'UNIDADE REQUISITANTE','UNIDADE DEMANDANTE',
+  'SETOR REQUISITANTE','SETOR DEMANDANTE',
+  'UNIDADE SOLICITANTE','SETOR SOLICITANTE',
+  'UNIDADE','SETOR',
+  'EXERCÍCIO','EXERCICIO',
+  'Nº DO ETP','NÚMERO DO ETP','NUMERO DO ETP',
+  'Nº','NÚMERO','NUMERO',
+  'PROCESSO ADMINISTRATIVO','PROCESSO',
+  'Nº DO PROCESSO','NÚMERO DO PROCESSO','NUMERO DO PROCESSO',
+  'DATA DE ELABORAÇÃO','DATA DE ELABORACAO','DATA',
+  'OBJETO DA CONTRATAÇÃO','OBJETO DA CONTRATACAO',
+  'OBJETO DA DEMANDA','OBJETO',
+  'DESCRIÇÃO RESUMIDA DO OBJETO','DESCRIÇÃO DO OBJETO','DESCRIÇÃO',
+  'JUSTIFICATIVA DA NECESSIDADE','JUSTIFICATIVA DA DEMANDA',
+  'JUSTIFICATIVA','NECESSIDADE','MOTIVAÇÃO',
+  'RESPONSÁVEL PELA ELABORAÇÃO','RESPONSÁVEL PELA DEMANDA',
+  'RESPONSÁVEL DA DEMANDA','RESPONSÁVEL TÉCNICO',
+  'RESPONSÁVEL','SOLICITANTE','ELABORADOR',
+  'CARGO / FUNÇÃO','CARGO/FUNÇÃO','CARGO E FUNÇÃO','CARGO OU FUNÇÃO',
+  'CARGO','FUNÇÃO','FUNCAO',
+  'E-MAIL INSTITUCIONAL','E-MAIL','EMAIL',
+  'TELEFONE','TEL','FONE','RAMAL',
+  'LOGOTIPO INSTITUCIONAL','LOGOTIPO','LOGO',
+  'VALOR ESTIMADO DA CONTRATAÇÃO','VALOR ESTIMADO DA CONTRATACAO',
+  'VALOR TOTAL ESTIMADO','VALOR ESTIMADO',
+  'VALOR GLOBAL','VALOR TOTAL','VALOR',
+  'DFD','Nº DO DFD','NÚMERO DO DFD','NUMERO DO DFD',
+  'DOCUMENTO DE FORMALIZAÇÃO DA DEMANDA','DOCUMENTO DE FORMALIZACAO DA DEMANDA',
+  'NÃO INFORMADO','NÃO INFORMADA','NÃO SE APLICA',
+  'N/A','N/D','ND','NA',
+  '-','--','---','—','–','...',
+  'DEMANDA','SOLICITAÇÃO','SOLICITACAO',
+  'TÉCNICO','TECNICO','PELA','PELO',
+  'ELABORAÇÃO','ELABORACAO'
 ];
 
-/** Normaliza um rótulo para comparação (remove acentos, pontuação e barras). */
 function normalizarLabel(s){
   return String(s || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')    // remove acentos
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase()
-    .replace(/[:\-–—|.,;]+/g, ' ')       // pontuação → espaço
-    .replace(/\//g, ' ')                  // "/" → espaço
+    .replace(/[:\-–—|.,;]+/g, ' ')
+    .replace(/\//g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
-/** Set normalizado (comparação O(1) e tolerante a variações visuais). */
-const LABELS_BLACKLIST = new Set(
-  LABELS_BLACKLIST_RAW.map(normalizarLabel)
-);
+const LABELS_BLACKLIST = new Set(LABELS_BLACKLIST_RAW.map(normalizarLabel));
 
-/** Retorna true se o valor for um rótulo visual conhecido (blacklist). */
 function ehLabelVisual(valor){
   if (valor == null) return true;
   const v = normalizarLabel(valor);
@@ -483,23 +459,15 @@ function ehLabelVisual(valor){
   return LABELS_BLACKLIST.has(v);
 }
 
-/* =====================================================================
-   10.2 · CLEAN VALUE
-   ===================================================================== */
-
+/* ---------- 10.2 · CLEAN VALUE ---------- */
 function cleanValue(text){
   if (text == null) return '';
   let v = String(text);
-
-  // 1) Normaliza quebras e espaços
   v = v.replace(/\r/g, '\n').replace(/\n+/g, ' ').replace(/\t/g, ' ');
   v = v.replace(/\s{2,}/g, ' ');
-
-  // 2) Remove pontuação residual nas extremidades
   v = v.replace(/^[\s:;\-–—_\/|>»•·●◦‣▪►]+/, '');
   v = v.replace(/[\s:;\-–—_\/|]+$/, '');
 
-  // 3) Remove fragmentos de rótulo embutidos (ex.: "CARGO / FUNÇÃO: Diretora")
   const fragmentos = [
     /cargo\s*\/\s*fun[çc][ãa]o\s*[:\-–—]?\s*/gi,
     /cargo\s*e\s*fun[çc][ãa]o\s*[:\-–—]?\s*/gi,
@@ -533,27 +501,16 @@ function cleanValue(text){
   ];
   fragmentos.forEach(rx => { v = v.replace(rx, ' '); });
 
-  // 4) Remove barras soltas
   v = v.replace(/\s*\/\s*/g, ' / ').replace(/(^|\s)\/(\s|$)/g, ' ');
-
-  // 5) Colapsa espaços finais
   v = v.replace(/\s{2,}/g, ' ').trim();
-
-  // 6) Descarta se virou rótulo da blacklist
   if (ehLabelVisual(v)) return '';
-
   return v;
 }
 
-/* =====================================================================
-   10.3 · SANITIZAÇÃO DO TEXTO BRUTO DO PDF
-   ===================================================================== */
-
+/* ---------- 10.3 · SANITIZAÇÃO DO TEXTO ---------- */
 function sanitizarTextoPDF(txt){
   if (!txt) return '';
   let t = String(txt).replace(/\r/g, '\n');
-
-  // Remove cabeçalho / rodapé institucional
   t = t.replace(/^[ \t]*LicitaReq[^\n]*$/gim, '');
   t = t.replace(/^[ \t]*LicitaAudit[^\n]*$/gim, '');
   t = t.replace(/^[ \t]*LicitaETP[^\n]*$/gim, '');
@@ -563,7 +520,6 @@ function sanitizarTextoPDF(txt){
   t = t.replace(/Documento\s+gerado\s+eletronicamente[^\n]*/gi, '');
   t = t.replace(/Emitido\s+em[^\n]*/gi, '');
 
-  // Junta rótulos que o PDF quebrou em 2 linhas
   t = t.replace(/CARGO\s*\/\s*\n\s*FUN[ÇC][ÃA]O/gi, 'CARGO / FUNÇÃO');
   t = t.replace(/RESPONS[ÁA]VEL\s*\n\s*PELA\s+DEMANDA/gi, 'RESPONSÁVEL PELA DEMANDA');
   t = t.replace(/UNIDADE\s*\n\s*REQUISITANTE/gi, 'UNIDADE REQUISITANTE');
@@ -575,60 +531,32 @@ function sanitizarTextoPDF(txt){
   t = t.replace(/OBJETO\s*\n\s*DA\s+CONTRATA[ÇC][ÃA]O/gi, 'OBJETO DA CONTRATAÇÃO');
   t = t.replace(/[ÓO]RG[ÃA]O\s*\n\s*\/?\s*ENTIDADE/gi, 'ÓRGÃO / ENTIDADE');
 
-  // Normaliza espaços por linha
   t = t.split('\n').map(l => l.replace(/[ \t]+/g, ' ').trim()).join('\n');
   return t;
 }
 
-/* =====================================================================
-   10.4 · EXTRAÇÃO POR ÂNCORA COM BLACKLIST (multi-linha)
-   ===================================================================== */
-
-/**
- * Procura o rótulo (no início de uma linha) e captura o valor.
- *  - Se o valor estiver na MESMA linha → retorna
- *  - Se a linha só tem o rótulo → olha as próximas N linhas
- *  - Ignora qualquer linha que seja um rótulo conhecido (blacklist)
- *  - Para ao encontrar o primeiro valor válido
- */
+/* ---------- 10.4 · EXTRAÇÃO POR ÂNCORA COM BLACKLIST ---------- */
 function extrairPorRotulo(texto, rotulos, opts = {}){
   const { maxLen = 300, maxLinhasAdiante = 6 } = opts;
   const linhas = String(texto).split('\n');
 
   for (const rotulo of rotulos){
     const rotEsc = String(rotulo).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-
-    // Regex: início de linha + rótulo + separador opcional + captura do resto
-    const rxRot = new RegExp(
-      `^\\s*${rotEsc}\\s*[:\\-–—|]?\\s*(.*)$`,
-      'i'
-    );
+    const rxRot = new RegExp(`^\\s*${rotEsc}\\s*[:\\-–—|]?\\s*(.*)$`, 'i');
 
     for (let i = 0; i < linhas.length; i++){
       const m = linhas[i].match(rxRot);
       if (!m) continue;
 
-      // ---------- 1) Valor na mesma linha ----------
       const inline = cleanValue(m[1]);
       if (inline) return inline.slice(0, maxLen);
 
-      // ---------- 2) Valor na(s) linha(s) seguinte(s) ----------
       for (let j = i + 1; j <= Math.min(i + maxLinhasAdiante, linhas.length - 1); j++){
         const candRaw = linhas[j];
-
-        // Linha vazia → continua
         if (!candRaw || !candRaw.trim()) continue;
-
-        // Se for rótulo visual conhecido → IGNORA e avança
         if (ehLabelVisual(candRaw)) continue;
-
-        // Processa normalmente
         const cand = cleanValue(candRaw);
-
-        // cleanValue pode ter rejeitado → tenta próxima linha
         if (!cand) continue;
-
-        // Valor válido
         return cand.slice(0, maxLen);
       }
     }
@@ -636,52 +564,192 @@ function extrairPorRotulo(texto, rotulos, opts = {}){
   return '';
 }
 
-/* =====================================================================
-   10.5 · EXTRAÇÃO DE BLOCO (Objeto, Justificativa)
-   ===================================================================== */
-
+/* ---------- 10.5 · EXTRAÇÃO DE BLOCO ---------- */
 function extrairBloco(texto, rotulo, rotulosFim, opts = {}){
   const { maxLen = 2000 } = opts;
   const esc_rot = rotulo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const altFim = (rotulosFim || [])
-    .map(r => r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
-    .join('|');
-
+  const altFim = (rotulosFim || []).map(r => r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
   const rx = altFim
-    ? new RegExp(
-        `(?:^|\\n)\\s*${esc_rot}\\s*[:\\-–—|]?\\s*([\\s\\S]{0,${maxLen}}?)(?=\\n\\s*(?:${altFim})\\s*[:\\-–—|]|\\n\\s*\\[\\[PAGINA|$)`,
-        'i'
-      )
-    : new RegExp(
-        `(?:^|\\n)\\s*${esc_rot}\\s*[:\\-–—|]?\\s*([\\s\\S]{0,${maxLen}})`,
-        'i'
-      );
-
+    ? new RegExp(`(?:^|\\n)\\s*${esc_rot}\\s*[:\\-–—|]?\\s*([\\s\\S]{0,${maxLen}}?)(?=\\n\\s*(?:${altFim})\\s*[:\\-–—|]|\\n\\s*\\[\\[PAGINA|$)`, 'i')
+    : new RegExp(`(?:^|\\n)\\s*${esc_rot}\\s*[:\\-–—|]?\\s*([\\s\\S]{0,${maxLen}})`, 'i');
   const m = texto.match(rx);
   if (!m || !m[1]) return '';
   return cleanValue(m[1]).slice(0, maxLen);
 }
 
-/* =====================================================================
-   10.6 · NORMALIZAÇÃO MONETÁRIA
-   ===================================================================== */
-
+/* ---------- 10.6 · NORMALIZAÇÃO MONETÁRIA ---------- */
 function normalizarMoeda(v){
   if (!v) return '';
   let s = String(v).replace(/[^\d.,]/g, '');
   if (!s) return '';
-  if (s.includes(',') && s.includes('.')){
-    s = s.replace(/\./g, '').replace(',', '.');
-  } else if (s.includes(',')){
-    s = s.replace(',', '.');
-  }
+  if (s.includes(',') && s.includes('.')) s = s.replace(/\./g, '').replace(',', '.');
+  else if (s.includes(',')) s = s.replace(',', '.');
   const n = parseFloat(s);
   return isNaN(n) ? '' : n.toFixed(2);
 }
 
-/* ---------------------------------------------------------------------
-   10.7 · FLUXO PRINCIPAL
-   --------------------------------------------------------------------- */
+/* =====================================================================
+   10.7 · EXTRAÇÃO DE IMAGENS (LOGO) DA PÁGINA 1 DO PDF
+   =====================================================================
+   Estratégia:
+   - Lê o operator list da página 1
+   - Coleta os IDs de imagens (objs.get / OPS.paintImageXObject)
+   - Pega cada objeto de imagem (bitmap RGBA)
+   - Converte o bitmap para DataURL (PNG) via canvas
+   - Escolhe a imagem mais adequada para "logo":
+       * dimensões entre 30x30 e 600x600
+       * proporção entre 0.3 e 3.0
+       * preferencialmente próxima ao topo da página (Y alto)
+   - Retorna DataURL ou null
+==================================================================== */
+async function extrairLogoDoPdf(file){
+  if (!window.pdfjsLib) return null;
+
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+  let pdf;
+  try {
+    const buf = await file.arrayBuffer();
+    pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+  } catch(e){
+    console.warn('[Logo] PDF inválido para extração de imagens:', e);
+    return null;
+  }
+
+  // Analisa apenas as 1ª e 2ª páginas (cabeçalho institucional costuma estar lá)
+  const paginasAlvo = Math.min(2, pdf.numPages);
+  const candidatos = [];
+
+  for (let p = 1; p <= paginasAlvo; p++){
+    try {
+      const page = await pdf.getPage(p);
+      const viewport = page.getViewport({ scale: 1 });
+      const opList = await page.getOperatorList();
+
+      const imageIds = new Set();
+      for (let i = 0; i < opList.fnArray.length; i++){
+        const fn = opList.fnArray[i];
+        const args = opList.argsArray[i];
+        // OPS.paintImageXObject / paintJpegXObject (referenciam por nome no args[0])
+        if (fn === pdfjsLib.OPS.paintImageXObject && args && args[0]){
+          imageIds.add(args[0]);
+        }
+        if (fn === pdfjsLib.OPS.paintJpegXObject && args && args[0]){
+          imageIds.add(args[0]);
+        }
+      }
+
+      for (const imgId of imageIds){
+        try {
+          // Obtém o objeto de imagem (pode estar no page.objs ou page.commonObjs)
+          const imgObj = await new Promise(resolve => {
+            try {
+              page.objs.get(imgId, resolve);
+            } catch(e){
+              // fallback: tenta em commonObjs
+              try { page.commonObjs.get(imgId, resolve); }
+              catch(e2){ resolve(null); }
+            }
+          });
+
+          if (!imgObj) continue;
+
+          const { width, height, data, kind } = imgObj;
+
+          if (!width || !height || !data) continue;
+          if (width < 20 || height < 20) continue;      // ignora ícones minúsculos
+          if (width > 900 || height > 900) continue;    // ignora grandes demais
+
+          const ratio = width / height;
+          if (ratio < 0.25 || ratio > 4.0) continue;    // ignora tarjas horizontais/verticais
+
+          // Calcula "área" para priorizar logos maiores
+          const area = width * height;
+          if (area < 1500) continue;
+
+          // Converte bitmap (RGBA) para DataURL PNG
+          const dataUrl = bitmapParaDataUrl(imgObj);
+          if (!dataUrl) continue;
+
+          candidatos.push({
+            dataUrl,
+            width,
+            height,
+            area,
+            pagina: p,
+            kind: kind || 'RGBA'
+          });
+        } catch(e){
+          // Ignora imagens individuais que falharem
+        }
+      }
+    } catch(e){
+      console.warn(`[Logo] Falha ao processar página ${p}:`, e);
+    }
+  }
+
+  if (!candidatos.length) return null;
+
+  // Ordena por área decrescente → escolhe a maior imagem válida
+  candidatos.sort((a, b) => b.area - a.area);
+  const melhor = candidatos[0];
+
+  console.info('[Logo] Imagem capturada do PDF:', {
+    largura: melhor.width,
+    altura: melhor.height,
+    pagina: melhor.pagina,
+    tamanhoKB: Math.round((melhor.dataUrl.length * 3 / 4) / 1024)
+  });
+
+  return melhor.dataUrl;
+}
+
+/** Converte um objeto de imagem do pdf.js ({width,height,data}) em DataURL PNG. */
+function bitmapParaDataUrl(imgObj){
+  try {
+    const { width, height, data, kind } = imgObj;
+    if (!width || !height || !data) return null;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+    const imgData = ctx.createImageData(width, height);
+
+    // Caso 1: dados já são RGBA (kind === 1 ou 'RGBA' ou undefined com 4×length)
+    if (data.length === width * height * 4){
+      imgData.data.set(data instanceof Uint8ClampedArray ? data : new Uint8ClampedArray(data));
+    }
+    // Caso 2: RGB (3×length)
+    else if (data.length === width * height * 3){
+      for (let i = 0, j = 0; i < data.length; i += 3, j += 4){
+        imgData.data[j]   = data[i];
+        imgData.data[j+1] = data[i+1];
+        imgData.data[j+2] = data[i+2];
+        imgData.data[j+3] = 255;
+      }
+    }
+    // Caso 3: grayscale (1×length)
+    else if (data.length === width * height){
+      for (let i = 0, j = 0; i < data.length; i++, j += 4){
+        const v = data[i];
+        imgData.data[j] = imgData.data[j+1] = imgData.data[j+2] = v;
+        imgData.data[j+3] = 255;
+      }
+    } else {
+      return null;
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+    return canvas.toDataURL('image/png');
+  } catch(e){
+    console.warn('[Logo] Erro ao converter bitmap:', e);
+    return null;
+  }
+}
+
+/* ---------- 10.8 · FLUXO PRINCIPAL ---------- */
 let dfdExtraido = null;
 
 function abrirImportarDFD(){
@@ -703,40 +771,68 @@ function fecharImportarDFD(){
 }
 
 async function processarDFD(file){
-  try {
-    const resultado = await extrairDadosDFD(file);
-    dfdExtraido = resultado;
+  const msgEl = document.getElementById('dfdResultMsg');
+  const list = document.getElementById('dfdResultList');
+  const resultBox = document.getElementById('dfdResult');
+  const btn = document.getElementById('dfdApplyBtn');
 
-    const list = document.getElementById('dfdResultList');
-    const msgEl = document.getElementById('dfdResultMsg');
-    const resultBox = document.getElementById('dfdResult');
-    const btn = document.getElementById('dfdApplyBtn');
+  try {
+    toast('Lendo DFD...');
+
+    const resultado = await extrairDadosDFD(file);
+
+    // Extrai a logo do PDF, se for PDF
+    let logoCapturada = null;
+    if ((file.name || '').toLowerCase().endsWith('.pdf')){
+      toast('Capturando logotipo institucional...');
+      try {
+        logoCapturada = await extrairLogoDoPdf(file);
+      } catch(e){
+        console.warn('[Logo] Não foi possível extrair logo:', e);
+      }
+    }
+
+    dfdExtraido = { ...resultado, logo: logoCapturada };
 
     const campos = Object.entries(resultado.campos).filter(([_, v]) => v && String(v).trim());
-    if (!campos.length){
-      toast('Nenhum campo reconhecido no arquivo.');
+    if (!campos.length && !logoCapturada){
+      toast('Nenhum campo ou logo reconhecido no arquivo.');
       return;
     }
 
-    msgEl.textContent = `${campos.length} campo(s) identificado(s) via ${resultado.origem.toUpperCase()}`;
+    msgEl.textContent = `${campos.length} campo(s) identificado(s) via ${resultado.origem.toUpperCase()}${logoCapturada ? ' + logotipo capturado' : ''}`;
     list.innerHTML = campos.map(([k, v]) => {
       const label = {
-        numero:       'Nº do DFD',
-        objeto:       'Objeto',
-        unidade:      'Unidade Requisitante',
-        responsavel:  'Responsável pela Demanda',
-        cargo:        'Cargo / Função',
-        email:        'E-mail',
-        telefone:     'Telefone',
-        valor:        'Valor Estimado',
-        justificativa:'Justificativa',
-        processo:     'Processo',
-        orgao:        'Órgão',
-        uasg:         'UASG'
+        numero:'Nº do DFD', objeto:'Objeto', unidade:'Unidade Requisitante',
+        responsavel:'Responsável pela Demanda', cargo:'Cargo / Função',
+        email:'E-mail', telefone:'Telefone', valor:'Valor Estimado',
+        justificativa:'Justificativa', processo:'Processo', orgao:'Órgão', uasg:'UASG'
       }[k] || k;
       const val = String(v).length > 140 ? String(v).slice(0, 137) + '…' : String(v);
       return `<li><span>${esc(label)}</span><span>${esc(val)}</span></li>`;
     }).join('');
+
+    // Preview da logo capturada
+    if (logoCapturada){
+      const logoLi = document.createElement('li');
+      logoLi.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px dashed rgba(22,163,74,.20);grid-column:1/-1';
+      logoLi.innerHTML = `
+        <span style="color:var(--tx-3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Logotipo institucional</span>
+        <span style="display:flex;align-items:center;gap:8px">
+          <img src="${logoCapturada}" alt="Logo capturada"
+               style="width:52px;height:52px;object-fit:contain;background:var(--bg-1);
+                      border:1px solid var(--bd-1);border-radius:8px;padding:3px" />
+          <span style="color:var(--ok);font-weight:700;font-size:11.5px">✓ capturado</span>
+        </span>`;
+      list.appendChild(logoLi);
+    } else {
+      const fallbackLi = document.createElement('li');
+      fallbackLi.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px dashed rgba(148,163,184,.25);grid-column:1/-1';
+      fallbackLi.innerHTML = `
+        <span style="color:var(--tx-3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Logotipo institucional</span>
+        <span style="color:var(--tx-3);font-size:11.5px">— mantida a logo padrão do ETP</span>`;
+      list.appendChild(fallbackLi);
+    }
 
     resultBox.classList.remove('hidden');
     btn.disabled = false;
@@ -749,24 +845,17 @@ async function processarDFD(file){
 async function extrairDadosDFD(file){
   const nome = (file?.name || '').toLowerCase();
   const tipo = (file?.type || '').toLowerCase();
-
   if (nome.endsWith('.json') || tipo.includes('json')) return extrairDFDJson(file);
   if (nome.endsWith('.pdf')  || tipo.includes('pdf'))  return extrairDFDPdf(file);
-
   throw new Error('Formato não suportado. Envie PDF ou JSON.');
 }
 
-/* ---------------------------------------------------------------------
-   10.8 · PARSER JSON (fallback LicitaReq)
-   --------------------------------------------------------------------- */
+/* ---------- 10.9 · PARSER JSON ---------- */
 async function extrairDFDJson(file){
   const txt = await file.text();
   let raw;
-  try { raw = JSON.parse(txt); }
-  catch(e){ throw new Error('JSON inválido.'); }
-
+  try { raw = JSON.parse(txt); } catch(e){ throw new Error('JSON inválido.'); }
   const d = raw?.dfd || raw?.dados?.dfd || raw?.documento?.dfd || raw?.dados || raw?.documento || raw;
-
   const pick = (...keys) => {
     for (const k of keys){
       const partes = String(k).split('.');
@@ -776,7 +865,6 @@ async function extrairDFDJson(file){
     }
     return '';
   };
-
   const campos = {
     numero:        cleanValue(pick('numero','numeroDFD','numero_dfd','numeroDfd','codigo','id')),
     objeto:        cleanValue(pick('objeto','objetoContratacao','descricao','descricaoObjeto','descricaoResumida','descricao_resumida')),
@@ -791,16 +879,14 @@ async function extrairDFDJson(file){
     orgao:         cleanValue(pick('orgao','orgaoEntidade','entidade','instituicao')),
     uasg:          cleanValue(pick('uasg','codigoUasg','codigo_uasg'))
   };
-
-  return { origem: 'json', campos, raw };
+  // Logo pode vir no JSON também
+  const logoJson = d.logo || d.logoInstitucional || d.logoBase64 || raw?.logo || null;
+  return { origem: 'json', campos, raw, logoJson };
 }
 
-/* ---------------------------------------------------------------------
-   10.9 · PARSER PDF (pdf.js + reconstrução de linhas por Y)
-   --------------------------------------------------------------------- */
+/* ---------- 10.10 · PARSER PDF ---------- */
 async function extrairDFDPdf(file){
   if (!window.pdfjsLib) throw new Error('Biblioteca pdf.js não disponível.');
-
   pdfjsLib.GlobalWorkerOptions.workerSrc =
     'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
@@ -811,16 +897,12 @@ async function extrairDFDPdf(file){
   for (let i = 1; i <= pdf.numPages; i++){
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-
-    // Agrupa itens por linha (Y arredondado)
     const porLinha = new Map();
     content.items.forEach(item => {
       const y = Math.round(item.transform[5] / 2) * 2;
       if (!porLinha.has(y)) porLinha.set(y, []);
       porLinha.get(y).push({ x: item.transform[4], str: item.str });
     });
-
-    // Ordena topo→base e esquerda→direita
     const ys = Array.from(porLinha.keys()).sort((a,b) => b - a);
     ys.forEach(y => {
       const linha = porLinha.get(y)
@@ -839,68 +921,48 @@ async function extrairDFDPdf(file){
   return { origem: 'pdf', campos, raw: textoLimpo };
 }
 
-/* =====================================================================
-   10.10 · EXTRAÇÃO DOS CAMPOS POR RÓTULOS EXATOS
-   ===================================================================== */
+/* ---------- 10.11 · EXTRAÇÃO POR RÓTULOS EXATOS ---------- */
 function extrairCamposDFD(texto){
   const t = texto;
   const campos = {
-    numero: '', objeto: '', unidade: '', responsavel: '',
-    cargo: '', email: '', telefone: '', valor: '',
-    justificativa: '', processo: '', orgao: '', uasg: ''
+    numero:'', objeto:'', unidade:'', responsavel:'',
+    cargo:'', email:'', telefone:'', valor:'',
+    justificativa:'', processo:'', orgao:'', uasg:''
   };
 
-  /* ---------- ÓRGÃO / ENTIDADE ---------- *
-   * A âncora é "ÓRGÃO / ENTIDADE" (com ou sem acento). O valor real está
-   * tipicamente na linha SEGUINTE (ex.: "Prefeitura Municipal de Exemplo").
-   * Se por acaso o PDF imprimiu o rótulo duas vezes, o loop de lookahead
-   * vai pular a repetição por causa da blacklist.                      */
   campos.orgao = extrairPorRotulo(t, [
-    'ÓRGÃO / ENTIDADE',
-    'ORGAO / ENTIDADE',
-    'ÓRGÃO ENTIDADE',
-    'ORGAO ENTIDADE',
-    'ÓRGÃO / ENTIDADE:',
-    'ÓRGÃO',
-    'ORGAO',
-    'ENTIDADE'
+    'ÓRGÃO / ENTIDADE','ORGAO / ENTIDADE','ÓRGÃO ENTIDADE','ORGAO ENTIDADE',
+    'ÓRGÃO / ENTIDADE:','ÓRGÃO','ORGAO','ENTIDADE'
   ], { maxLen: 200, maxLinhasAdiante: 4 });
 
-  /* ---------- UASG ---------- */
-  campos.uasg = extrairPorRotulo(t, [
-    'UASG / CÓDIGO', 'UASG/CÓDIGO', 'UASG'
-  ], { maxLen: 40, maxLinhasAdiante: 3 });
+  campos.uasg = extrairPorRotulo(t, ['UASG / CÓDIGO','UASG/CÓDIGO','UASG'], { maxLen: 40, maxLinhasAdiante: 3 });
   if (campos.uasg && !/\d/.test(campos.uasg)) campos.uasg = '';
 
-  /* ---------- Nº do DFD ---------- */
   {
     let m = t.match(/(?:N[º°º]?\s*(?:do\s*)?DFD|DFD\s*n?[º°º]?)\s*[:\-–—]?\s*(\d{1,6}\s*\/\s*\d{2,4})/i);
     if (!m) m = t.match(/\bDFD\s+(\d{1,6}\s*\/\s*\d{2,4})/i);
     if (m) campos.numero = cleanValue(m[1]).replace(/\s*\/\s*/, '/');
   }
 
-  /* ---------- Processo Administrativo ---------- */
   campos.processo = extrairPorRotulo(t, [
-    'Processo Administrativo', 'Nº do Processo', 'Número do Processo',
-    'Numero do Processo', 'Processo'
+    'Processo Administrativo','Nº do Processo','Número do Processo',
+    'Numero do Processo','Processo'
   ], { maxLen: 80, maxLinhasAdiante: 3 });
   if (campos.processo && !/\d/.test(campos.processo)) campos.processo = '';
 
-  /* ---------- Objeto (bloco) ---------- */
   {
     const rotulosInicio = [
-      'Descrição Resumida do Objeto', 'Descrição do Objeto',
-      'Objeto da Contratação', 'Objeto da Contratacao',
-      'Objeto da Demanda', 'Objeto'
+      'Descrição Resumida do Objeto','Descrição do Objeto',
+      'Objeto da Contratação','Objeto da Contratacao','Objeto da Demanda','Objeto'
     ];
     const rotulosFim = [
-      'Justificativa da Necessidade', 'Justificativa',
-      'Unidade Requisitante', 'Unidade Demandante',
-      'Setor Requisitante', 'Setor Demandante',
-      'Responsável pela Demanda', 'Responsável Técnico', 'Responsável',
-      'Valor Estimado da Contratação', 'Valor Estimado', 'Valor Global', 'Valor',
-      'Cargo / Função', 'Cargo/Função', 'Cargo', 'Função',
-      'Processo Administrativo', 'Processo'
+      'Justificativa da Necessidade','Justificativa',
+      'Unidade Requisitante','Unidade Demandante',
+      'Setor Requisitante','Setor Demandante',
+      'Responsável pela Demanda','Responsável Técnico','Responsável',
+      'Valor Estimado da Contratação','Valor Estimado','Valor Global','Valor',
+      'Cargo / Função','Cargo/Função','Cargo','Função',
+      'Processo Administrativo','Processo'
     ];
     for (const rot of rotulosInicio){
       const bloco = extrairBloco(t, rot, rotulosFim, { maxLen: 1200 });
@@ -908,31 +970,17 @@ function extrairCamposDFD(texto){
     }
   }
 
-  /* ---------- Unidade Requisitante ---------- *
-   * Rota EXCLUSIVA da unidade/setor. Captura a próxima linha que não seja
-   * um rótulo visual (ex.: "Diretoria de Tecnologia da Informação").    */
   campos.unidade = extrairPorRotulo(t, [
-    'Unidade Requisitante',
-    'Unidade Demandante',
-    'Setor Requisitante',
-    'Setor Demandante',
-    'Unidade Solicitante',
-    'Setor Solicitante',
-    'Unidade / Setor Demandante',
-    'Unidade / Setor'
+    'Unidade Requisitante','Unidade Demandante','Setor Requisitante',
+    'Setor Demandante','Unidade Solicitante','Setor Solicitante',
+    'Unidade / Setor Demandante','Unidade / Setor'
   ], { maxLen: 200, maxLinhasAdiante: 4 });
 
-  /* ---------- Responsável pela Demanda ---------- *
-   * Filtros anti-falso-positivo:
-   *  - Blacklist (skip automático de rótulos)
-   *  - Exige >= 2 palavras
-   *  - Exige ao menos uma inicial maiúscula (nome próprio)
-   *  - Descarta nomes que sejam claramente palavras de contexto       */
   campos.responsavel = extrairPorRotulo(t, [
-    'Responsável pela Demanda', 'Responsavel pela Demanda',
-    'Responsável da Demanda', 'Responsável Técnico', 'Responsavel Tecnico',
-    'Responsável pela Elaboração', 'Responsável pela Solicitação',
-    'Responsável', 'Solicitante'
+    'Responsável pela Demanda','Responsavel pela Demanda','Responsável da Demanda',
+    'Responsável Técnico','Responsavel Tecnico',
+    'Responsável pela Elaboração','Responsável pela Solicitação',
+    'Responsável','Solicitante'
   ], { maxLen: 160, maxLinhasAdiante: 4 });
 
   if (campos.responsavel){
@@ -941,12 +989,9 @@ function extrairCamposDFD(texto){
     if (palavras.length < 2 || !temInicialMaiuscula) campos.responsavel = '';
   }
 
-  /* ---------- Cargo / Função ---------- *
-   * Rota EXCLUSIVA do cargo. Não cruza com responsável nem unidade.
-   * Blacklist + cleanValue removem qualquer fragmento "CARGO / FUNÇÃO". */
   campos.cargo = extrairPorRotulo(t, [
-    'Cargo / Função', 'Cargo/Função', 'Cargo / Funcao', 'Cargo/Funcao',
-    'Cargo e Função', 'Cargo ou Função', 'Cargo', 'Função'
+    'Cargo / Função','Cargo/Função','Cargo / Funcao','Cargo/Funcao',
+    'Cargo e Função','Cargo ou Função','Cargo','Função'
   ], { maxLen: 160, maxLinhasAdiante: 4 });
 
   if (campos.cargo){
@@ -954,24 +999,19 @@ function extrairCamposDFD(texto){
     if (['função','funcao','cargo','/','—','-'].includes(lower)) campos.cargo = '';
   }
 
-  /* ---------- E-mail ---------- */
   {
     const m = t.match(/([\w._%+\-]+@[\w.\-]+\.[A-Za-z]{2,})/);
     if (m) campos.email = cleanValue(m[1]);
   }
-
-  /* ---------- Telefone ---------- */
   {
     const m = t.match(/(?:Telefone|Tel|Fone|Ramal)\s*[:\-–—]?\s*(\(?\d{2}\)?\s*[\s\-]?\d{4,5}[\s\-]?\d{4})/i);
     if (m) campos.telefone = cleanValue(m[1]);
   }
 
-  /* ---------- Valor Estimado ---------- */
   {
     let valor = extrairPorRotulo(t, [
-      'Valor Estimado da Contratação', 'Valor Estimado da Contratacao',
-      'Valor Total Estimado', 'Valor Estimado', 'Valor Global',
-      'Valor Total', 'Valor Previsto'
+      'Valor Estimado da Contratação','Valor Estimado da Contratacao',
+      'Valor Total Estimado','Valor Estimado','Valor Global','Valor Total','Valor Previsto'
     ], { maxLen: 60, maxLinhasAdiante: 4 });
 
     if (!/\d/.test(valor)){
@@ -990,16 +1030,15 @@ function extrairCamposDFD(texto){
     campos.valor = normalizarMoeda(valor);
   }
 
-  /* ---------- Justificativa ---------- */
   {
     const rotulosFim = [
-      'Unidade Requisitante', 'Unidade Demandante',
-      'Setor Requisitante', 'Setor Demandante',
-      'Responsável pela Demanda', 'Responsável Técnico', 'Responsável',
-      'Valor Estimado da Contratação', 'Valor Estimado', 'Valor Global', 'Valor',
-      'Cargo / Função', 'Cargo/Função', 'Cargo', 'Função',
-      'Processo Administrativo', 'Processo',
-      'Servidores', 'Quantidade', 'Item', 'Prioridade', 'Prazo'
+      'Unidade Requisitante','Unidade Demandante',
+      'Setor Requisitante','Setor Demandante',
+      'Responsável pela Demanda','Responsável Técnico','Responsável',
+      'Valor Estimado da Contratação','Valor Estimado','Valor Global','Valor',
+      'Cargo / Função','Cargo/Função','Cargo','Função',
+      'Processo Administrativo','Processo',
+      'Servidores','Quantidade','Item','Prioridade','Prazo'
     ];
     let just = extrairBloco(t, 'Justificativa da Necessidade', rotulosFim, { maxLen: 2000 });
     if (!just) just = extrairBloco(t, 'Justificativa da Contratação', rotulosFim, { maxLen: 2000 });
@@ -1009,7 +1048,6 @@ function extrairCamposDFD(texto){
     campos.justificativa = just;
   }
 
-  /* ---------- Limpeza final ---------- */
   Object.keys(campos).forEach(k => {
     if (typeof campos[k] === 'string') campos[k] = cleanValue(campos[k]);
   });
@@ -1017,22 +1055,16 @@ function extrairCamposDFD(texto){
   return campos;
 }
 
-/* ---------------------------------------------------------------------
-   10.11 · APLICAÇÃO DOS CAMPOS NO ETP
-   --------------------------------------------------------------------- */
+/* ---------- 10.12 · APLICAÇÃO DOS CAMPOS + LOGO NO ETP ---------- */
 function aplicarImportacaoDFD(){
   if (!dfdExtraido) return;
-  const c = dfdExtraido.campos;
-  const setV = (id, v) => {
-    const el = document.getElementById(id);
-    if (el && v) el.value = String(v);
-  };
+  const c = dfdExtraido.campos || {};
+  const setV = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = String(v); };
 
-  // Mapeamento DFD → ETP (1 campo por vez, sem cruzamento)
   if (c.objeto)        setV('objeto', c.objeto);
-  if (c.unidade)       setV('unidade', c.unidade);          // Unidade → unidade
-  if (c.responsavel)   setV('responsavel', c.responsavel);  // Resp.  → responsavel
-  if (c.cargo)         setV('cargoResponsavel', c.cargo);   // Cargo  → cargoResponsavel
+  if (c.unidade)       setV('unidade', c.unidade);
+  if (c.responsavel)   setV('responsavel', c.responsavel);
+  if (c.cargo)         setV('cargoResponsavel', c.cargo);
   if (c.email)         setV('email', c.email);
   if (c.telefone)      setV('telefone', c.telefone);
   if (c.processo)      setV('processo', c.processo);
@@ -1040,7 +1072,6 @@ function aplicarImportacaoDFD(){
   if (c.orgao)         setV('orgao', c.orgao);
   if (c.uasg)          setV('uasg', c.uasg);
 
-  // Registra o nº do DFD como referência do PCA (só se vazio)
   if (c.numero){
     const justEl = document.getElementById('pcaJustificativa');
     if (justEl && !justEl.value){
@@ -1048,7 +1079,6 @@ function aplicarImportacaoDFD(){
     }
   }
 
-  // Valor estimado → primeira linha da tabela de preços
   if (c.valor){
     const primeiro = document.querySelector('#tbPreco tr');
     if (primeiro){
@@ -1064,12 +1094,22 @@ function aplicarImportacaoDFD(){
     }
   }
 
+  /* ---------- Aplica a logo capturada ---------- */
+  let origemLogo = 'default';
+  if (dfdExtraido.logo){
+    aplicarLogoCapturada(dfdExtraido.logo, 'dfd');
+    origemLogo = 'dfd';
+  } else if (dfdExtraido.logoJson){
+    aplicarLogoCapturada(dfdExtraido.logoJson, 'dfd');
+    origemLogo = 'dfd';
+  }
+
   const qtdAplicados = Object.keys(c).filter(k => c[k]).length;
-  toast(`DFD importado · ${qtdAplicados} campo(s) aplicado(s).`);
+  const msgLogo = origemLogo === 'dfd' ? ' · logotipo herdado do DFD' : '';
+  toast(`DFD importado · ${qtdAplicados} campo(s)${msgLogo}.`);
   fecharImportarDFD();
   goTo(0);
 
-  // Destaque visual dos campos preenchidos
   setTimeout(() => {
     ['objeto','unidade','responsavel','cargoResponsavel','necessidade','processo','orgao']
       .forEach(id => {
@@ -1081,6 +1121,34 @@ function aplicarImportacaoDFD(){
         }
       });
   }, 200);
+}
+
+/** Injeta uma logo (dataURL) na UI, marca a origem e destaca visualmente. */
+function aplicarLogoCapturada(dataUrl, origem = 'dfd'){
+  if (!dataUrl) return;
+  logoDataUrl = dataUrl;
+  logoOrigem  = origem;
+
+  const img = document.getElementById('logoPreviewImg');
+  const empty = document.getElementById('logoDropzoneEmpty');
+  const preview = document.getElementById('logoDropzonePreview');
+  const dz = document.getElementById('logoDropzone');
+  const nameEl = document.getElementById('logoPreviewName');
+  const sizeEl = document.getElementById('logoPreviewSize');
+
+  if (img) img.src = dataUrl;
+  if (nameEl) nameEl.textContent = origem === 'dfd' ? 'logotipo-herdado-do-dfd.png' : 'logotipo.png';
+  if (sizeEl) sizeEl.textContent = origem === 'dfd' ? '— herdado do DFD —' : '— carregado —';
+  empty?.classList.add('hidden');
+  preview?.classList.remove('hidden');
+  dz?.classList.add('has-file');
+
+  // Glow verde temporário para sinalizar herança
+  if (dz){
+    dz.style.transition = 'box-shadow .5s';
+    dz.style.boxShadow = '0 0 0 4px rgba(16,185,129,.45)';
+    setTimeout(() => { dz.style.boxShadow = ''; }, 1800);
+  }
 }
 
 /* =====================================================================
@@ -1409,7 +1477,7 @@ function montarDocumento(d, conf, meta){
       author: d.id.orgao || 'LicitaETP',
       subject: 'ETP — Lei nº 14.133/2021, art. 18, § 1º',
       keywords: `ETP, Licitações, Lei 14.133/2021, ${meta.tag}`,
-      creator: 'LicitaETP v2.3'
+      creator: 'LicitaETP v2.4'
     },
     header: (cp, total) => {
       if (cp <= 3 || cp === total) return null;
@@ -1444,7 +1512,7 @@ function montarDocumento(d, conf, meta){
 }
 
 /* =====================================================================
-   14. UTILITÁRIOS — NOME, CÓDIGO, HASH
+   14. UTILITÁRIOS
    ===================================================================== */
 function nomeArquivo(){
   const raw = (document.getElementById('numeroEtp')?.value || '001');
@@ -1505,7 +1573,7 @@ async function gerarPDF(){
 
   pdfMake.createPdf(doc).download(arquivo, () => {
     toast(`PDF gerado: ${arquivo} · ${tag}`);
-    console.info('[LicitaAudit] Payload de auditoria:', { tag, hash, arquivo, conformidade: conf.score, dados:d });
+    console.info('[LicitaAudit] Payload de auditoria:', { tag, hash, arquivo, conformidade: conf.score, logoOrigem, dados:d });
   });
 }
 
@@ -1520,8 +1588,10 @@ async function exportarJSON(){
   const emitidoEm = new Date().toISOString();
   const hash = await sha256Hex(JSON.stringify({ etp:d, tag, emitidoEm }));
   const pacote = {
-    sistema:'LicitaETP', versao:'2.3.0', trilha:'LICITAETP', tipo:'auditoria',
+    sistema:'LicitaETP', versao:'2.4.0', trilha:'LICITAETP', tipo:'auditoria',
     tag, hash, emitidoEm,
+    logo: logoDataUrl,
+    logoOrigem,
     conformidade: { score:conf.score, incisos:conf.linhas.map(l => ({ inciso:l.n, status:l.status, pct:l.pct })) },
     etp:d
   };
@@ -1540,9 +1610,10 @@ async function exportarJSON(){
 function salvarRascunho(){
   try {
     const pacote = {
-      sistema:'LicitaETP', versao:'2.3.0', tipo:'rascunho',
+      sistema:'LicitaETP', versao:'2.4.0', tipo:'rascunho',
       salvoEm: new Date().toISOString(),
       logo: logoDataUrl,
+      logoOrigem,
       dados: coletarDados()
     };
     const json = JSON.stringify(pacote, null, 2);
@@ -1570,16 +1641,11 @@ async function processarArquivoJSON(file){
     const d = pacote.dados || pacote;
     aplicarDados(d);
     if (pacote.logo){
-      logoDataUrl = pacote.logo;
-      const img = document.getElementById('logoPreviewImg');
-      if (img) img.src = pacote.logo;
-      document.getElementById('logoDropzoneEmpty')?.classList.add('hidden');
-      document.getElementById('logoDropzonePreview')?.classList.remove('hidden');
-      document.getElementById('logoDropzone')?.classList.add('has-file');
-      const nm = document.getElementById('logoPreviewName');
-      const sz = document.getElementById('logoPreviewSize');
-      if (nm) nm.textContent = 'logotipo-restaurado.png';
-      if (sz) sz.textContent = '— restaurado do rascunho —';
+      aplicarLogoCapturada(pacote.logo, 'rascunho');
+      const nameEl = document.getElementById('logoPreviewName');
+      const sizeEl = document.getElementById('logoPreviewSize');
+      if (nameEl) nameEl.textContent = 'logotipo-restaurado.png';
+      if (sizeEl) sizeEl.textContent = '— restaurado do rascunho —';
     }
     toast(`Rascunho carregado · ${file.name}`);
   } catch(e){ console.error(e); toast('Arquivo JSON inválido ou corrompido.'); }
@@ -1628,7 +1694,7 @@ function aplicarDados(d){
 }
 
 /* =====================================================================
-   18. DRAG & DROP — LOGOTIPO
+   18. DRAG & DROP — LOGOTIPO MANUAL
    ===================================================================== */
 function inicializarDropzoneLogo(){
   const dz = document.getElementById('logoDropzone');
@@ -1663,10 +1729,11 @@ function inicializarDropzoneLogo(){
   });
   removeBtn?.addEventListener('click', e => {
     e.stopPropagation();
-    logoDataUrl = null; input.value = '';
+    logoDataUrl = null; logoOrigem = 'default';
+    input.value = '';
     preview?.classList.add('hidden'); empty?.classList.remove('hidden');
     dz.classList.remove('has-file');
-    toast('Logotipo removido.');
+    toast('Logotipo removido. Voltando à logo padrão.');
   });
 
   async function processar(file){
@@ -1678,12 +1745,9 @@ function inicializarDropzoneLogo(){
         const r = new FileReader();
         r.onload = ev => res(ev.target.result); r.onerror = rej; r.readAsDataURL(file);
       });
-      logoDataUrl = dataUrl;
-      if (img) img.src = dataUrl;
+      aplicarLogoCapturada(dataUrl, 'manual');
       if (nameEl) nameEl.textContent = file.name;
       if (sizeEl) sizeEl.textContent = fmt(file.size);
-      empty?.classList.add('hidden'); preview?.classList.remove('hidden');
-      dz.classList.add('has-file');
       toast(`Logotipo carregado: ${file.name}`);
     } catch(e){ console.error(e); toast('Falha ao ler o arquivo.'); }
   }
@@ -1804,5 +1868,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /* =====================================================================
-   FIM — LicitaETP v2.3
+   FIM — LicitaETP v2.4
    ===================================================================== */
