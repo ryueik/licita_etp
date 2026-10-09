@@ -1301,6 +1301,124 @@ function extrairCamposDFD(texto, paginas){
 }
 
 /* =====================================================================
+   10.11 · APLICAÇÃO DOS CAMPOS + LOGO NO ETP
+   ===================================================================== */
+function aplicarImportacaoDFD(){
+  try {
+    if (!dfdExtraido){
+      toast('Nenhum DFD carregado. Importe o arquivo primeiro.');
+      return;
+    }
+
+    const c = dfdExtraido.campos || {};
+    const setV = (id, v) => {
+      const el = document.getElementById(id);
+      if (el && v) el.value = String(v);
+    };
+
+    /* ---------- Campos de identificação ---------- */
+    if (c.objeto)        setV('objeto', c.objeto);
+    if (c.unidade)       setV('unidade', c.unidade);
+    if (c.responsavel)   setV('responsavel', c.responsavel);
+    if (c.cargo)         setV('cargoResponsavel', c.cargo);
+    if (c.email)         setV('email', c.email);
+    if (c.telefone)      setV('telefone', c.telefone);
+    if (c.processo)      setV('processo', c.processo);
+    if (c.justificativa) setV('necessidade', c.justificativa);
+    if (c.orgao)         setV('orgao', c.orgao);
+    if (c.uasg)          setV('uasg', c.uasg);
+
+    /* ---------- Nº do DFD → justificativa do PCA ---------- */
+    if (c.numero){
+      const justEl = document.getElementById('pcaJustificativa');
+      if (justEl && !justEl.value){
+        justEl.value = `Documento de Formalização da Demanda (DFD) nº ${c.numero} importado automaticamente.`;
+      }
+    }
+
+    /* ---------- Valor estimado → 1ª linha da tabela de preços ---------- */
+    if (c.valor){
+      let primeiro = document.querySelector('#tbPreco tr');
+      if (!primeiro){
+        if (typeof addPreco === 'function') addPreco();
+        primeiro = document.querySelector('#tbPreco tr');
+      }
+      if (primeiro){
+        const itemEl  = primeiro.querySelector('[data-k="item"]');
+        const fonteEl = primeiro.querySelector('[data-k="fonte"]');
+        const unitEl  = primeiro.querySelector('[data-k="unitario"]');
+        const qtdEl   = primeiro.querySelector('[data-k="quantidade"]');
+        if (itemEl  && !itemEl.value)  itemEl.value  = c.objeto ? c.objeto.slice(0, 80) : 'Item importado do DFD';
+        if (fonteEl && !fonteEl.value) fonteEl.value = 'Valor estimado — DFD';
+        if (unitEl  && !unitEl.value)  unitEl.value  = c.valor;
+        if (qtdEl   && !qtdEl.value)   qtdEl.value   = '1';
+        recalcularTotal();
+      }
+    }
+
+    /* ---------- Logo herdada do DFD / JSON ---------- */
+    let origemLogo = 'default';
+    if (dfdExtraido.logo){
+      aplicarLogoCapturada(dfdExtraido.logo, 'dfd');
+      origemLogo = 'dfd';
+    } else if (dfdExtraido.logoJson){
+      aplicarLogoCapturada(dfdExtraido.logoJson, 'dfd');
+      origemLogo = 'dfd';
+    }
+
+    const qtdAplicados = Object.keys(c).filter(k => c[k]).length;
+    const msgLogo = origemLogo === 'dfd' ? ' · logotipo herdado do DFD' : '';
+    toast(`DFD importado · ${qtdAplicados} campo(s)${msgLogo}.`);
+    fecharImportarDFD();
+    goTo(0);
+
+    /* ---------- Destaque visual temporário ---------- */
+    setTimeout(() => {
+      ['objeto','unidade','responsavel','cargoResponsavel','necessidade','processo','orgao']
+        .forEach(id => {
+          const el = document.getElementById(id);
+          if (el && el.value){
+            el.style.transition = 'box-shadow .4s';
+            el.style.boxShadow = '0 0 0 3px rgba(16,185,129,.35)';
+            setTimeout(() => el.style.boxShadow = '', 1400);
+          }
+        });
+    }, 200);
+
+  } catch(err){
+    console.error('[DFD] Falha ao aplicar importação:', err);
+    toast('Erro ao aplicar o DFD: ' + (err?.message || err));
+  }
+}
+
+/** Injeta uma logo (dataURL) na UI, marca a origem e destaca visualmente. */
+function aplicarLogoCapturada(dataUrl, origem = 'dfd'){
+  if (!dataUrl) return;
+  logoDataUrl = dataUrl;
+  logoOrigem  = origem;
+
+  const img     = document.getElementById('logoPreviewImg');
+  const empty   = document.getElementById('logoDropzoneEmpty');
+  const preview = document.getElementById('logoDropzonePreview');
+  const dz      = document.getElementById('logoDropzone');
+  const nameEl  = document.getElementById('logoPreviewName');
+  const sizeEl  = document.getElementById('logoPreviewSize');
+
+  if (img)     img.src = dataUrl;
+  if (nameEl)  nameEl.textContent = origem === 'dfd' ? 'logotipo-herdado-do-dfd.png' : 'logotipo.png';
+  if (sizeEl)  sizeEl.textContent = origem === 'dfd' ? '— herdado do DFD —' : '— carregado —';
+  empty?.classList.add('hidden');
+  preview?.classList.remove('hidden');
+  dz?.classList.add('has-file');
+
+  if (dz){
+    dz.style.transition = 'box-shadow .5s';
+    dz.style.boxShadow = '0 0 0 4px rgba(16,185,129,.45)';
+    setTimeout(() => { dz.style.boxShadow = ''; }, 1800);
+  }
+}
+
+/* =====================================================================
    11. HELPERS PDF
    ===================================================================== */
 const BRAND = '#0F2F5B', BRAND2 = '#1E6F5C', MUTED = '#64748B', LINEC = '#CBD5E1';
