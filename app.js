@@ -395,74 +395,111 @@ function calcularConformidade(d){
 }
 
 /* =====================================================================
-   10. IMPORTAÇÃO DE DFD — PARSER REFINADO POR RÓTULOS EXATOS
+   10.1 · BLACKLIST DE RÓTULOS VISUAIS
    ===================================================================== */
 
-/* ---------------------------------------------------------------------
-   10.1 · BLACKLIST GLOBAL DE RÓTULOS
-   ---------------------------------------------------------------------
-   Palavras/frases que NUNCA podem ser tratadas como valor. Servem para
-   descartar capturas acidentais de rótulos que apareceram no PDF.
-   -------------------------------------------------------------------- */
-const ROTULOS_PROIBIDOS = [
-  'cargo / função', 'cargo/função', 'cargo e função', 'cargo',
-  'função', 'funcao',
-  'responsável pela demanda', 'responsavel pela demanda',
-  'responsável técnico', 'responsavel tecnico', 'responsável',
-  'unidade requisitante', 'unidade demandante', 'setor requisitante',
-  'setor demandante', 'unidade', 'setor',
-  'valor estimado da contratação', 'valor estimado da contratacao',
-  'valor estimado', 'valor total', 'valor global', 'valor',
-  'justificativa da necessidade', 'justificativa', 'necessidade',
-  'descrição resumida do objeto', 'descrição do objeto', 'objeto',
-  'processo administrativo', 'processo',
-  'nº do dfd', 'número do dfd', 'dfd',
-  'demanda', 'solicitação', 'solicitacao', 'elaboração', 'elaboracao',
-  'técnico', 'tecnico', 'pela', 'da', 'do', 'de', 'e'
+/** Lista bruta de rótulos que NUNCA podem ser tratados como valor. */
+const LABELS_BLACKLIST_RAW = [
+  /* ---- Cabeçalhos institucionais ---- */
+  'ÓRGÃO / ENTIDADE', 'ÓRGÃO ENTIDADE', 'ÓRGÃO/ENTIDADE',
+  'ÓRGÃO', 'ENTIDADE',
+  'UASG / CÓDIGO', 'UASG/CÓDIGO', 'UASG',
+  'UNIDADE / SETOR DEMANDANTE', 'UNIDADE / SETOR',
+  'UNIDADE REQUISITANTE', 'UNIDADE DEMANDANTE',
+  'SETOR REQUISITANTE', 'SETOR DEMANDANTE',
+  'UNIDADE SOLICITANTE', 'SETOR SOLICITANTE',
+  'UNIDADE', 'SETOR',
+
+  /* ---- Identificação ---- */
+  'EXERCÍCIO', 'EXERCICIO',
+  'Nº DO ETP', 'NÚMERO DO ETP', 'NUMERO DO ETP',
+  'Nº', 'NÚMERO', 'NUMERO',
+  'PROCESSO ADMINISTRATIVO', 'PROCESSO',
+  'Nº DO PROCESSO', 'NÚMERO DO PROCESSO', 'NUMERO DO PROCESSO',
+  'DATA DE ELABORAÇÃO', 'DATA DE ELABORACAO', 'DATA',
+
+  /* ---- Conteúdo ---- */
+  'OBJETO DA CONTRATAÇÃO', 'OBJETO DA CONTRATACAO',
+  'OBJETO DA DEMANDA', 'OBJETO',
+  'DESCRIÇÃO RESUMIDA DO OBJETO', 'DESCRIÇÃO DO OBJETO', 'DESCRIÇÃO',
+  'JUSTIFICATIVA DA NECESSIDADE', 'JUSTIFICATIVA DA DEMANDA',
+  'JUSTIFICATIVA', 'NECESSIDADE', 'MOTIVAÇÃO',
+
+  /* ---- Responsáveis ---- */
+  'RESPONSÁVEL PELA ELABORAÇÃO', 'RESPONSÁVEL PELA DEMANDA',
+  'RESPONSÁVEL DA DEMANDA', 'RESPONSÁVEL TÉCNICO',
+  'RESPONSÁVEL', 'SOLICITANTE', 'ELABORADOR',
+  'CARGO / FUNÇÃO', 'CARGO/FUNÇÃO', 'CARGO E FUNÇÃO', 'CARGO OU FUNÇÃO',
+  'CARGO', 'FUNÇÃO', 'FUNCAO',
+
+  /* ---- Contato ---- */
+  'E-MAIL INSTITUCIONAL', 'E-MAIL', 'EMAIL',
+  'TELEFONE', 'TEL', 'FONE', 'RAMAL',
+  'LOGOTIPO INSTITUCIONAL', 'LOGOTIPO', 'LOGO',
+
+  /* ---- Preços ---- */
+  'VALOR ESTIMADO DA CONTRATAÇÃO', 'VALOR ESTIMADO DA CONTRATACAO',
+  'VALOR TOTAL ESTIMADO', 'VALOR ESTIMADO',
+  'VALOR GLOBAL', 'VALOR TOTAL', 'VALOR',
+
+  /* ---- DFD ---- */
+  'DFD', 'Nº DO DFD', 'NÚMERO DO DFD', 'NUMERO DO DFD',
+  'DOCUMENTO DE FORMALIZAÇÃO DA DEMANDA',
+  'DOCUMENTO DE FORMALIZACAO DA DEMANDA',
+
+  /* ---- Placeholders vazios ---- */
+  'NÃO INFORMADO', 'NÃO INFORMADA', 'NÃO SE APLICA',
+  'N/A', 'N/D', 'ND', 'NA',
+  '-', '--', '---', '—', '–', '...',
+
+  /* ---- Palavras soltas que vazam ---- */
+  'DEMANDA', 'SOLICITAÇÃO', 'SOLICITACAO',
+  'TÉCNICO', 'TECNICO', 'PELA', 'PELO',
+  'ELABORAÇÃO', 'ELABORACAO'
 ];
 
-/** Verifica se uma string é (ou essencialmente só contém) um rótulo conhecido. */
-function ehRotuloGenerico(valor){
-  if (!valor) return true;
-  const v = String(valor).toLowerCase().replace(/[\s:;\-–—\/|.]+/g, ' ').trim();
-  if (!v) return true;
-  // Se for exatamente um dos rótulos proibidos
-  for (const r of ROTULOS_PROIBIDOS){
-    if (v === r) return true;
-  }
-  // Se for apenas 1 palavra com ≤ 3 letras (geralmente conectivo)
-  const palavras = v.split(/\s+/).filter(Boolean);
-  if (palavras.length === 1 && palavras[0].length <= 3) return true;
-  return false;
+/** Normaliza um rótulo para comparação (remove acentos, pontuação e barras). */
+function normalizarLabel(s){
+  return String(s || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')    // remove acentos
+    .toLowerCase()
+    .replace(/[:\-–—|.,;]+/g, ' ')       // pontuação → espaço
+    .replace(/\//g, ' ')                  // "/" → espaço
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
-/* ---------------------------------------------------------------------
-   10.2 · FUNÇÃO CLEAN VALUE
-   ---------------------------------------------------------------------
-   Remove lixo visual do PDF capturado junto ao valor:
-   - barras soltas no início/fim ("/", "|")
-   - dois-pontos e traços residuais (":", "-", "–", "—")
-   - quebras de linha (\n, \r) e espaços duplos
-   - fragmentos de rótulos ("CARGO / FUNÇÃO", "RESPONSÁVEL PELA DEMANDA")
-   - valores que são apenas rótulos genéricos
-   -------------------------------------------------------------------- */
+/** Set normalizado (comparação O(1) e tolerante a variações visuais). */
+const LABELS_BLACKLIST = new Set(
+  LABELS_BLACKLIST_RAW.map(normalizarLabel)
+);
+
+/** Retorna true se o valor for um rótulo visual conhecido (blacklist). */
+function ehLabelVisual(valor){
+  if (valor == null) return true;
+  const v = normalizarLabel(valor);
+  if (!v) return true;
+  return LABELS_BLACKLIST.has(v);
+}
+
+/* =====================================================================
+   10.2 · CLEAN VALUE
+   ===================================================================== */
+
 function cleanValue(text){
   if (text == null) return '';
   let v = String(text);
 
-  // 1) Normaliza quebras de linha e espaços
-  v = v.replace(/\r/g, '\n');
-  v = v.replace(/\n+/g, ' ');
-  v = v.replace(/\t/g, ' ');
+  // 1) Normaliza quebras e espaços
+  v = v.replace(/\r/g, '\n').replace(/\n+/g, ' ').replace(/\t/g, ' ');
   v = v.replace(/\s{2,}/g, ' ');
 
-  // 2) Remove caracteres de "lista" que o PDF costuma deixar
+  // 2) Remove pontuação residual nas extremidades
   v = v.replace(/^[\s:;\-–—_\/|>»•·●◦‣▪►]+/, '');
   v = v.replace(/[\s:;\-–—_\/|]+$/, '');
 
-  // 3) Remove fragmentos de rótulos recorrentes (case-insensitive)
-  //    Ex.: "CARGO / FUNÇÃO: Diretora" → "Diretora"
-  //    Ex.: "Cargo /\nFunção Diretora de TI" → "Diretora de TI"
+  // 3) Remove fragmentos de rótulo embutidos (ex.: "CARGO / FUNÇÃO: Diretora")
   const fragmentos = [
     /cargo\s*\/\s*fun[çc][ãa]o\s*[:\-–—]?\s*/gi,
     /cargo\s*e\s*fun[çc][ãa]o\s*[:\-–—]?\s*/gi,
@@ -489,30 +526,34 @@ function cleanValue(text){
     /objeto\s*[:\-–—]?\s*/gi,
     /processo\s+administrativo\s*[:\-–—]?\s*/gi,
     /n[º°º]?\s*do\s+dfd\s*[:\-–—]?\s*/gi,
-    /^\s*dfd\s*[:\-–—]?\s*/gi
+    /^\s*dfd\s*[:\-–—]?\s*/gi,
+    /[óo]rg[ãa]o\s*\/\s*entidade\s*[:\-–—]?\s*/gi,
+    /[óo]rg[ãa]o\s+entidade\s*[:\-–—]?\s*/gi,
+    /uasg\s*\/\s*c[óo]digo\s*[:\-–—]?\s*/gi
   ];
   fragmentos.forEach(rx => { v = v.replace(rx, ' '); });
 
-  // 4) Remove barras soltas remanescentes (sobras visuais)
+  // 4) Remove barras soltas
   v = v.replace(/\s*\/\s*/g, ' / ').replace(/(^|\s)\/(\s|$)/g, ' ');
 
-  // 5) Colapsa espaços
+  // 5) Colapsa espaços finais
   v = v.replace(/\s{2,}/g, ' ').trim();
 
-  // 6) Descarta se virou rótulo genérico
-  if (ehRotuloGenerico(v)) return '';
+  // 6) Descarta se virou rótulo da blacklist
+  if (ehLabelVisual(v)) return '';
 
   return v;
 }
 
-/* ---------------------------------------------------------------------
+/* =====================================================================
    10.3 · SANITIZAÇÃO DO TEXTO BRUTO DO PDF
-   --------------------------------------------------------------------- */
+   ===================================================================== */
+
 function sanitizarTextoPDF(txt){
   if (!txt) return '';
   let t = String(txt).replace(/\r/g, '\n');
 
-  // Remove cabeçalho/rodapé institucional
+  // Remove cabeçalho / rodapé institucional
   t = t.replace(/^[ \t]*LicitaReq[^\n]*$/gim, '');
   t = t.replace(/^[ \t]*LicitaAudit[^\n]*$/gim, '');
   t = t.replace(/^[ \t]*LicitaETP[^\n]*$/gim, '');
@@ -522,9 +563,7 @@ function sanitizarTextoPDF(txt){
   t = t.replace(/Documento\s+gerado\s+eletronicamente[^\n]*/gi, '');
   t = t.replace(/Emitido\s+em[^\n]*/gi, '');
 
-  // Junta rótulos que o PDF quebrou em 2 linhas:
-  //   "CARGO /"         →  "CARGO / FUNÇÃO"
-  //   "FUNÇÃO"
+  // Junta rótulos que o PDF quebrou em 2 linhas
   t = t.replace(/CARGO\s*\/\s*\n\s*FUN[ÇC][ÃA]O/gi, 'CARGO / FUNÇÃO');
   t = t.replace(/RESPONS[ÁA]VEL\s*\n\s*PELA\s+DEMANDA/gi, 'RESPONSÁVEL PELA DEMANDA');
   t = t.replace(/UNIDADE\s*\n\s*REQUISITANTE/gi, 'UNIDADE REQUISITANTE');
@@ -534,55 +573,73 @@ function sanitizarTextoPDF(txt){
   t = t.replace(/VALOR\s*\n\s*ESTIMADO/gi, 'VALOR ESTIMADO');
   t = t.replace(/JUSTIFICATIVA\s*\n\s*DA\s+DEMANDA/gi, 'JUSTIFICATIVA DA DEMANDA');
   t = t.replace(/OBJETO\s*\n\s*DA\s+CONTRATA[ÇC][ÃA]O/gi, 'OBJETO DA CONTRATAÇÃO');
+  t = t.replace(/[ÓO]RG[ÃA]O\s*\n\s*\/?\s*ENTIDADE/gi, 'ÓRGÃO / ENTIDADE');
 
-  // Normaliza espaços por linha, mas mantém quebras
+  // Normaliza espaços por linha
   t = t.split('\n').map(l => l.replace(/[ \t]+/g, ' ').trim()).join('\n');
-
   return t;
 }
 
-/* ---------------------------------------------------------------------
-   10.4 · EXTRAÇÃO POR ÂNCORA
-   ---------------------------------------------------------------------
-   Busca o rótulo (com fronteira de palavra) e captura o valor que
-   está na mesma linha (após ":", "-", "—") OU na linha seguinte.
-   -------------------------------------------------------------------- */
+/* =====================================================================
+   10.4 · EXTRAÇÃO POR ÂNCORA COM BLACKLIST (multi-linha)
+   ===================================================================== */
+
+/**
+ * Procura o rótulo (no início de uma linha) e captura o valor.
+ *  - Se o valor estiver na MESMA linha → retorna
+ *  - Se a linha só tem o rótulo → olha as próximas N linhas
+ *  - Ignora qualquer linha que seja um rótulo conhecido (blacklist)
+ *  - Para ao encontrar o primeiro valor válido
+ */
 function extrairPorRotulo(texto, rotulos, opts = {}){
-  const { maxLen = 300 } = opts;
+  const { maxLen = 300, maxLinhasAdiante = 6 } = opts;
+  const linhas = String(texto).split('\n');
 
   for (const rotulo of rotulos){
-    const esc_rot = rotulo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rotEsc = String(rotulo).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-    // Padrão A: RÓTULO: valor na mesma linha
-    // Aceita ":", "-", "–", "—", "|" ou nada
-    const rxInline = new RegExp(
-      `(?:^|\\n)\\s*${esc_rot}\\s*[:\\-–—|]?\\s*([^\\n]{1,${maxLen}})`,
+    // Regex: início de linha + rótulo + separador opcional + captura do resto
+    const rxRot = new RegExp(
+      `^\\s*${rotEsc}\\s*[:\\-–—|]?\\s*(.*)$`,
       'i'
     );
-    let m = texto.match(rxInline);
-    if (m && m[1]){
-      const val = cleanValue(m[1]);
-      if (val) return val;
-    }
 
-    // Padrão B: RÓTULO (com ":" ou não) seguido de quebra de linha e valor
-    const rxLinha = new RegExp(
-      `(?:^|\\n)\\s*${esc_rot}\\s*[:\\-–—|]?\\s*\\n+\\s*([^\\n]{1,${maxLen}})`,
-      'i'
-    );
-    m = texto.match(rxLinha);
-    if (m && m[1]){
-      const val = cleanValue(m[1]);
-      if (val) return val;
+    for (let i = 0; i < linhas.length; i++){
+      const m = linhas[i].match(rxRot);
+      if (!m) continue;
+
+      // ---------- 1) Valor na mesma linha ----------
+      const inline = cleanValue(m[1]);
+      if (inline) return inline.slice(0, maxLen);
+
+      // ---------- 2) Valor na(s) linha(s) seguinte(s) ----------
+      for (let j = i + 1; j <= Math.min(i + maxLinhasAdiante, linhas.length - 1); j++){
+        const candRaw = linhas[j];
+
+        // Linha vazia → continua
+        if (!candRaw || !candRaw.trim()) continue;
+
+        // Se for rótulo visual conhecido → IGNORA e avança
+        if (ehLabelVisual(candRaw)) continue;
+
+        // Processa normalmente
+        const cand = cleanValue(candRaw);
+
+        // cleanValue pode ter rejeitado → tenta próxima linha
+        if (!cand) continue;
+
+        // Valor válido
+        return cand.slice(0, maxLen);
+      }
     }
   }
-
   return '';
 }
 
-/* ---------------------------------------------------------------------
-   10.5 · EXTRAÇÃO DE BLOCO (para Objeto / Justificativa)
-   --------------------------------------------------------------------- */
+/* =====================================================================
+   10.5 · EXTRAÇÃO DE BLOCO (Objeto, Justificativa)
+   ===================================================================== */
+
 function extrairBloco(texto, rotulo, rotulosFim, opts = {}){
   const { maxLen = 2000 } = opts;
   const esc_rot = rotulo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -605,14 +662,14 @@ function extrairBloco(texto, rotulo, rotulosFim, opts = {}){
   return cleanValue(m[1]).slice(0, maxLen);
 }
 
-/* ---------------------------------------------------------------------
+/* =====================================================================
    10.6 · NORMALIZAÇÃO MONETÁRIA
-   --------------------------------------------------------------------- */
+   ===================================================================== */
+
 function normalizarMoeda(v){
   if (!v) return '';
   let s = String(v).replace(/[^\d.,]/g, '');
   if (!s) return '';
-  // Se tem vírgula E ponto → ponto é milhar
   if (s.includes(',') && s.includes('.')){
     s = s.replace(/\./g, '').replace(',', '.');
   } else if (s.includes(',')){
@@ -782,9 +839,9 @@ async function extrairDFDPdf(file){
   return { origem: 'pdf', campos, raw: textoLimpo };
 }
 
-/* ---------------------------------------------------------------------
+/* =====================================================================
    10.10 · EXTRAÇÃO DOS CAMPOS POR RÓTULOS EXATOS
-   --------------------------------------------------------------------- */
+   ===================================================================== */
 function extrairCamposDFD(texto){
   const t = texto;
   const campos = {
@@ -793,49 +850,48 @@ function extrairCamposDFD(texto){
     justificativa: '', processo: '', orgao: '', uasg: ''
   };
 
-  /* -------- Nº do DFD -------- */
+  /* ---------- ÓRGÃO / ENTIDADE ---------- *
+   * A âncora é "ÓRGÃO / ENTIDADE" (com ou sem acento). O valor real está
+   * tipicamente na linha SEGUINTE (ex.: "Prefeitura Municipal de Exemplo").
+   * Se por acaso o PDF imprimiu o rótulo duas vezes, o loop de lookahead
+   * vai pular a repetição por causa da blacklist.                      */
+  campos.orgao = extrairPorRotulo(t, [
+    'ÓRGÃO / ENTIDADE',
+    'ORGAO / ENTIDADE',
+    'ÓRGÃO ENTIDADE',
+    'ORGAO ENTIDADE',
+    'ÓRGÃO / ENTIDADE:',
+    'ÓRGÃO',
+    'ORGAO',
+    'ENTIDADE'
+  ], { maxLen: 200, maxLinhasAdiante: 4 });
+
+  /* ---------- UASG ---------- */
+  campos.uasg = extrairPorRotulo(t, [
+    'UASG / CÓDIGO', 'UASG/CÓDIGO', 'UASG'
+  ], { maxLen: 40, maxLinhasAdiante: 3 });
+  if (campos.uasg && !/\d/.test(campos.uasg)) campos.uasg = '';
+
+  /* ---------- Nº do DFD ---------- */
   {
     let m = t.match(/(?:N[º°º]?\s*(?:do\s*)?DFD|DFD\s*n?[º°º]?)\s*[:\-–—]?\s*(\d{1,6}\s*\/\s*\d{2,4})/i);
-    if (!m){
-      m = t.match(/\bDFD\s+(\d{1,6}\s*\/\s*\d{2,4})/i);
-    }
+    if (!m) m = t.match(/\bDFD\s+(\d{1,6}\s*\/\s*\d{2,4})/i);
     if (m) campos.numero = cleanValue(m[1]).replace(/\s*\/\s*/, '/');
   }
 
-  /* -------- Processo Administrativo -------- */
-  {
-    campos.processo = extrairPorRotulo(t, [
-      'Processo Administrativo',
-      'Nº do Processo',
-      'Número do Processo',
-      'Numero do Processo',
-      'Processo'
-    ], { maxLen: 80 });
-    if (campos.processo && !/\d/.test(campos.processo)) campos.processo = '';
-  }
+  /* ---------- Processo Administrativo ---------- */
+  campos.processo = extrairPorRotulo(t, [
+    'Processo Administrativo', 'Nº do Processo', 'Número do Processo',
+    'Numero do Processo', 'Processo'
+  ], { maxLen: 80, maxLinhasAdiante: 3 });
+  if (campos.processo && !/\d/.test(campos.processo)) campos.processo = '';
 
-  /* -------- Órgão / Entidade -------- */
-  campos.orgao = extrairPorRotulo(t, [
-    'Órgão / Entidade',
-    'Orgao / Entidade',
-    'Órgão',
-    'Orgao',
-    'Entidade'
-  ], { maxLen: 180 });
-
-  /* -------- UASG -------- */
-  campos.uasg = extrairPorRotulo(t, ['UASG'], { maxLen: 40 });
-  if (campos.uasg && !/\d/.test(campos.uasg)) campos.uasg = '';
-
-  /* -------- Objeto (bloco) -------- */
+  /* ---------- Objeto (bloco) ---------- */
   {
     const rotulosInicio = [
-      'Descrição Resumida do Objeto',
-      'Descrição do Objeto',
-      'Objeto da Contratação',
-      'Objeto da Contratacao',
-      'Objeto da Demanda',
-      'Objeto'
+      'Descrição Resumida do Objeto', 'Descrição do Objeto',
+      'Objeto da Contratação', 'Objeto da Contratacao',
+      'Objeto da Demanda', 'Objeto'
     ];
     const rotulosFim = [
       'Justificativa da Necessidade', 'Justificativa',
@@ -848,124 +904,93 @@ function extrairCamposDFD(texto){
     ];
     for (const rot of rotulosInicio){
       const bloco = extrairBloco(t, rot, rotulosFim, { maxLen: 1200 });
-      if (bloco && bloco.length > 5){
-        campos.objeto = bloco;
-        break;
-      }
+      if (bloco && bloco.length > 5){ campos.objeto = bloco; break; }
     }
   }
 
-  /* -------- Unidade Requisitante (rota EXCLUSIVA da Unidade) -------- */
-  {
-    campos.unidade = extrairPorRotulo(t, [
-      'Unidade Requisitante',
-      'Unidade Demandante',
-      'Setor Requisitante',
-      'Setor Demandante',
-      'Unidade Solicitante',
-      'Setor Solicitante'
-    ], { maxLen: 200 });
+  /* ---------- Unidade Requisitante ---------- *
+   * Rota EXCLUSIVA da unidade/setor. Captura a próxima linha que não seja
+   * um rótulo visual (ex.: "Diretoria de Tecnologia da Informação").    */
+  campos.unidade = extrairPorRotulo(t, [
+    'Unidade Requisitante',
+    'Unidade Demandante',
+    'Setor Requisitante',
+    'Setor Demandante',
+    'Unidade Solicitante',
+    'Setor Solicitante',
+    'Unidade / Setor Demandante',
+    'Unidade / Setor'
+  ], { maxLen: 200, maxLinhasAdiante: 4 });
+
+  /* ---------- Responsável pela Demanda ---------- *
+   * Filtros anti-falso-positivo:
+   *  - Blacklist (skip automático de rótulos)
+   *  - Exige >= 2 palavras
+   *  - Exige ao menos uma inicial maiúscula (nome próprio)
+   *  - Descarta nomes que sejam claramente palavras de contexto       */
+  campos.responsavel = extrairPorRotulo(t, [
+    'Responsável pela Demanda', 'Responsavel pela Demanda',
+    'Responsável da Demanda', 'Responsável Técnico', 'Responsavel Tecnico',
+    'Responsável pela Elaboração', 'Responsável pela Solicitação',
+    'Responsável', 'Solicitante'
+  ], { maxLen: 160, maxLinhasAdiante: 4 });
+
+  if (campos.responsavel){
+    const palavras = campos.responsavel.split(/\s+/).filter(Boolean);
+    const temInicialMaiuscula = /[A-ZÀ-Ú]/.test(campos.responsavel);
+    if (palavras.length < 2 || !temInicialMaiuscula) campos.responsavel = '';
   }
 
-  /* -------- Responsável pela Demanda (anti-falso-positivo) -------- */
-  {
-    campos.responsavel = extrairPorRotulo(t, [
-      'Responsável pela Demanda',
-      'Responsavel pela Demanda',
-      'Responsável da Demanda',
-      'Responsável Técnico',
-      'Responsavel Tecnico',
-      'Responsável pela Elaboração',
-      'Responsável pela Solicitação',
-      'Responsável',
-      'Solicitante'
-    ], { maxLen: 160 });
+  /* ---------- Cargo / Função ---------- *
+   * Rota EXCLUSIVA do cargo. Não cruza com responsável nem unidade.
+   * Blacklist + cleanValue removem qualquer fragmento "CARGO / FUNÇÃO". */
+  campos.cargo = extrairPorRotulo(t, [
+    'Cargo / Função', 'Cargo/Função', 'Cargo / Funcao', 'Cargo/Funcao',
+    'Cargo e Função', 'Cargo ou Função', 'Cargo', 'Função'
+  ], { maxLen: 160, maxLinhasAdiante: 4 });
 
-    // Filtros defensivos
-    if (campos.responsavel){
-      const lower = campos.responsavel.toLowerCase().trim();
-      const proibidos = ['demanda','solicitação','solicitacao','técnico','tecnico','pela','da','do','de','elaboração','elaboracao','/'];
-      if (proibidos.some(p => lower === p)){
-        campos.responsavel = '';
-      }
-      // Exige ao menos 2 palavras e uma letra inicial maiúscula
-      const palavras = campos.responsavel.split(/\s+/).filter(Boolean);
-      if (palavras.length < 2 || !/[A-ZÀ-Ú]/.test(campos.responsavel)){
-        campos.responsavel = '';
-      }
-    }
+  if (campos.cargo){
+    const lower = campos.cargo.toLowerCase().trim();
+    if (['função','funcao','cargo','/','—','-'].includes(lower)) campos.cargo = '';
   }
 
-  /* -------- Cargo / Função (rota EXCLUSIVA do Cargo) -------- */
-  {
-    campos.cargo = extrairPorRotulo(t, [
-      'Cargo / Função',
-      'Cargo/Função',
-      'Cargo / Funcao',
-      'Cargo/Funcao',
-      'Cargo e Função',
-      'Cargo ou Função',
-      'Cargo'
-    ], { maxLen: 160 });
-
-    // Se capturou o rótulo como valor, descarta
-    if (campos.cargo){
-      const lower = campos.cargo.toLowerCase().trim();
-      if (lower === 'função' || lower === 'funcao' || lower === 'cargo' ||
-          lower.startsWith('função ') || lower.startsWith('funcao ') ||
-          lower === '/' || lower === ''){
-        campos.cargo = '';
-      }
-    }
-  }
-
-  /* -------- E-mail -------- */
+  /* ---------- E-mail ---------- */
   {
     const m = t.match(/([\w._%+\-]+@[\w.\-]+\.[A-Za-z]{2,})/);
     if (m) campos.email = cleanValue(m[1]);
   }
 
-  /* -------- Telefone -------- */
+  /* ---------- Telefone ---------- */
   {
     const m = t.match(/(?:Telefone|Tel|Fone|Ramal)\s*[:\-–—]?\s*(\(?\d{2}\)?\s*[\s\-]?\d{4,5}[\s\-]?\d{4})/i);
     if (m) campos.telefone = cleanValue(m[1]);
   }
 
-  /* -------- Valor Estimado (3 níveis de fallback) -------- */
+  /* ---------- Valor Estimado ---------- */
   {
     let valor = extrairPorRotulo(t, [
-      'Valor Estimado da Contratação',
-      'Valor Estimado da Contratacao',
-      'Valor Total Estimado',
-      'Valor Estimado',
-      'Valor Global',
-      'Valor Total',
-      'Valor Previsto'
-    ], { maxLen: 60 });
+      'Valor Estimado da Contratação', 'Valor Estimado da Contratacao',
+      'Valor Total Estimado', 'Valor Estimado', 'Valor Global',
+      'Valor Total', 'Valor Previsto'
+    ], { maxLen: 60, maxLinhasAdiante: 4 });
 
-    // Se o rótulo capturou só "R$" ou nada numérico, procura número na mesma linha
     if (!/\d/.test(valor)){
       const rx = /(?:Valor\s+(?:Total\s+)?Estimado|Valor\s+Global)[^\n]{0,60}?R?\$?\s*([\d]{1,3}(?:[.\s]\d{3})*(?:,\d{2})?|\d+(?:[.,]\d{2})?)/i;
       const m = t.match(rx);
       if (m) valor = m[1];
     }
-
-    // Fallback: primeiro R$ do documento
     if (!valor || !/\d/.test(valor)){
       const m = t.match(/R\$\s*([\d]{1,3}(?:[.\s]\d{3})*(?:,\d{2})?|\d+(?:[.,]\d{2})?)/);
       if (m) valor = m[1];
     }
-
-    // Fallback final: número formatado BR (>= 1000)
     if (!valor || !/\d/.test(valor)){
       const m = t.match(/\b(\d{1,3}(?:\.\d{3})+,\d{2})\b/);
       if (m) valor = m[1];
     }
-
     campos.valor = normalizarMoeda(valor);
   }
 
-  /* -------- Justificativa (bloco) -------- */
+  /* ---------- Justificativa ---------- */
   {
     const rotulosFim = [
       'Unidade Requisitante', 'Unidade Demandante',
@@ -976,21 +1001,17 @@ function extrairCamposDFD(texto){
       'Processo Administrativo', 'Processo',
       'Servidores', 'Quantidade', 'Item', 'Prioridade', 'Prazo'
     ];
-
     let just = extrairBloco(t, 'Justificativa da Necessidade', rotulosFim, { maxLen: 2000 });
     if (!just) just = extrairBloco(t, 'Justificativa da Contratação', rotulosFim, { maxLen: 2000 });
     if (!just) just = extrairBloco(t, 'Justificativa', rotulosFim, { maxLen: 2000 });
     if (!just) just = extrairBloco(t, 'Descrição da Necessidade', rotulosFim, { maxLen: 2000 });
     if (!just) just = extrairBloco(t, 'Necessidade', rotulosFim, { maxLen: 2000 });
-
     campos.justificativa = just;
   }
 
-  /* -------- Limpeza final (belt & suspenders) -------- */
+  /* ---------- Limpeza final ---------- */
   Object.keys(campos).forEach(k => {
-    if (typeof campos[k] === 'string'){
-      campos[k] = cleanValue(campos[k]);
-    }
+    if (typeof campos[k] === 'string') campos[k] = cleanValue(campos[k]);
   });
 
   return campos;
