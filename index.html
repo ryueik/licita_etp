@@ -8,34 +8,24 @@
 <meta name="theme-color" content="#10B981" media="(prefers-color-scheme: light)" />
 <meta name="theme-color" content="#070B14" media="(prefers-color-scheme: dark)" />
 
-<!-- Favicon SVG verde com letras brancas -->
 <link id="favicon" rel="icon" type="image/svg+xml"
   href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%2310B981'/%3E%3Cstop offset='1' stop-color='%23059669'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='64' height='64' rx='14' fill='url(%23g)'/%3E%3Ctext x='32' y='43' font-family='ui-sans-serif,system-ui,sans-serif' font-size='26' font-weight='900' fill='%23FFFFFF' text-anchor='middle' letter-spacing='0.5'%3EETP%3C/text%3E%3C/svg%3E" />
 
-<!-- Tailwind (utilities only — preflight desligado para não sobrescrever tokens) -->
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
-  tailwind.config = {
-    corePlugins: { preflight: false },
-    theme: { extend: { screens: { xs: '481px' } } }
-  };
+  tailwind.config = { corePlugins: { preflight: false }, theme: { extend: { screens: { xs: '481px' } } } };
 </script>
 
-<!-- pdfMake -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/vfs_fonts.js"></script>
-
-<!-- pdf.js (leitura de DFD em PDF) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
 
-<!-- ============================ HEADER ============================ -->
 <header class="app-header">
-  <div class="app-header-inner max-w-[1480px] mx-auto px-3 sm:px-4 lg:px-6 py-3
-              flex items-center justify-between gap-3 sm:gap-4 flex-wrap">
+  <div class="app-header-inner max-w-[1480px] mx-auto px-3 sm:px-4 lg:px-6 py-3 flex items-center justify-between gap-3 sm:gap-4 flex-wrap">
     <div class="brand">
       <div class="brand-logo" id="brandLogo"></div>
       <div class="brand-text">
@@ -67,12 +57,8 @@
       </button>
 
       <button class="btn btn-ghost btn-icon" id="themeToggle" onclick="alternarTema()" title="Alternar tema (Dark / Light)">
-        <svg id="iconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none">
-          <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
-        </svg>
-        <svg id="iconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
-        </svg>
+        <svg id="iconSun" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+        <svg id="iconMoon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
       </button>
 
       <button class="btn btn-accent" onclick="gerarPDF()">
@@ -83,11 +69,8 @@
   </div>
 </header>
 
-<div class="app-layout max-w-[1480px] mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-6
-            grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)]
-            gap-3 sm:gap-4 lg:gap-6">
+<div class="app-layout max-w-[1480px] mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-6 grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)] gap-3 sm:gap-4 lg:gap-6">
 
-  <!-- ============================ SIDEBAR ============================ -->
   <aside class="sidebar min-w-0">
     <div class="card sidebar-card">
       <div class="sidebar-top">
@@ -95,19 +78,16 @@
           <span class="sidebar-label">Etapas do ETP</span>
           <span id="stepCounter" class="sidebar-counter">1 / 13</span>
         </div>
-        <div class="progress-track">
-          <div id="progressBar" class="progress-fill" style="width:7.7%"></div>
-        </div>
+        <div class="progress-track"><div id="progressBar" class="progress-fill" style="width:7.7%"></div></div>
       </div>
       <nav id="stepNav" class="step-nav"></nav>
     </div>
   </aside>
 
-  <!-- ============================ MAIN ============================ -->
   <main class="main-area min-w-0">
     <div class="card main-card">
 
-      <!-- ---------- 0 · IDENTIFICAÇÃO ---------- -->
+      <!-- ============ 0 · IDENTIFICAÇÃO ============ -->
       <section data-panel="0" class="panel">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -119,72 +99,31 @@
 
         <div class="dfd-callout" onclick="abrirImportarDFD()" role="button" tabindex="0">
           <div class="dfd-callout-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M12 3v13"/><polyline points="7 11 12 16 17 11"/><path d="M5 21h14"/>
-            </svg>
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><polyline points="7 11 12 16 17 11"/><path d="M5 21h14"/></svg>
           </div>
           <div class="dfd-callout-text">
             <strong>Importar DFD automaticamente</strong>
             <span>Arraste o JSON (do LicitaReq) ou o PDF oficial do DFD — os campos serão preenchidos automaticamente.</span>
           </div>
-          <div class="dfd-callout-action">
-            <span class="dfd-chip">PDF</span>
-            <span class="dfd-chip">JSON</span>
-          </div>
+          <div class="dfd-callout-action"><span class="dfd-chip">PDF</span><span class="dfd-chip">JSON</span></div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-          <div class="sm:col-span-2">
-            <label class="lbl">Órgão / Entidade</label>
-            <input id="orgao" class="inp" placeholder="Ex.: Tribunal Regional Federal da 1ª Região" />
-          </div>
-          <div>
-            <label class="lbl">UASG / Código</label>
-            <input id="uasg" class="inp" placeholder="Ex.: 123456" />
-          </div>
-          <div class="sm:col-span-2">
-            <label class="lbl">Unidade / Setor Demandante</label>
-            <input id="unidade" class="inp" placeholder="Ex.: Coordenação de Tecnologia da Informação" />
-          </div>
-          <div>
-            <label class="lbl">Exercício</label>
-            <input id="exercicio" class="inp" placeholder="2026" />
-          </div>
+          <div class="sm:col-span-2"><label class="lbl">Órgão / Entidade</label><input id="orgao" class="inp" placeholder="Ex.: Tribunal Regional Federal da 1ª Região" /></div>
+          <div><label class="lbl">UASG / Código</label><input id="uasg" class="inp" placeholder="Ex.: 123456" /></div>
+          <div class="sm:col-span-2"><label class="lbl">Unidade / Setor Demandante</label><input id="unidade" class="inp" placeholder="Ex.: Coordenação de Tecnologia da Informação" /></div>
+          <div><label class="lbl">Exercício</label><input id="exercicio" class="inp" placeholder="2026" /></div>
           <div>
             <label class="lbl">Nº do ETP <span class="hint">(automático)</span></label>
-            <div class="inp-with-prefix">
-              <span class="prefix">ETP</span>
-              <input id="numeroEtp" class="inp inp-prefixed" placeholder="001" />
-            </div>
+            <div class="inp-with-prefix"><span class="prefix">ETP</span><input id="numeroEtp" class="inp inp-prefixed" placeholder="001" /></div>
           </div>
-          <div>
-            <label class="lbl">Processo Administrativo</label>
-            <input id="processo" class="inp" placeholder="Ex.: 00000.000123/2026-10" />
-          </div>
-          <div>
-            <label class="lbl">Data de Elaboração</label>
-            <input id="dataElaboracao" type="date" class="inp" />
-          </div>
-          <div class="sm:col-span-2 lg:col-span-3">
-            <label class="lbl">Objeto da Contratação (resumo)</label>
-            <input id="objeto" class="inp" placeholder="Ex.: Aquisição de 120 microcomputadores desktop" />
-          </div>
-          <div class="sm:col-span-2">
-            <label class="lbl">Responsável pela Elaboração</label>
-            <input id="responsavel" class="inp" placeholder="Nome completo" />
-          </div>
-          <div>
-            <label class="lbl">Cargo / Função</label>
-            <input id="cargoResponsavel" class="inp" placeholder="Ex.: Analista Judiciário" />
-          </div>
-          <div>
-            <label class="lbl">E-mail Institucional</label>
-            <input id="email" class="inp" placeholder="nome@orgao.gov.br" />
-          </div>
-          <div>
-            <label class="lbl">Telefone</label>
-            <input id="telefone" class="inp" placeholder="(00) 0000-0000" />
-          </div>
+          <div><label class="lbl">Processo Administrativo</label><input id="processo" class="inp" placeholder="Ex.: 00000.000123/2026-10" /></div>
+          <div><label class="lbl">Data de Elaboração</label><input id="dataElaboracao" type="date" class="inp" /></div>
+          <div class="sm:col-span-2 lg:col-span-3"><label class="lbl">Objeto da Contratação (resumo)</label><input id="objeto" class="inp" placeholder="Ex.: Aquisição de 120 microcomputadores desktop" /></div>
+          <div class="sm:col-span-2"><label class="lbl">Responsável pela Elaboração</label><input id="responsavel" class="inp" placeholder="Nome completo" /></div>
+          <div><label class="lbl">Cargo / Função</label><input id="cargoResponsavel" class="inp" placeholder="Ex.: Analista Judiciário" /></div>
+          <div><label class="lbl">E-mail Institucional</label><input id="email" class="inp" placeholder="nome@orgao.gov.br" /></div>
+          <div><label class="lbl">Telefone</label><input id="telefone" class="inp" placeholder="(00) 0000-0000" /></div>
 
           <div class="sm:col-span-2 lg:col-span-3">
             <label class="lbl">Logotipo Institucional</label>
@@ -192,11 +131,7 @@
               <input type="file" id="logoFile" accept="image/*" hidden />
               <div class="dropzone-empty" id="logoDropzoneEmpty">
                 <div class="dropzone-icon">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="3" width="18" height="18" rx="3"/>
-                    <circle cx="8.5" cy="8.5" r="1.5"/>
-                    <polyline points="21 15 16 10 5 21"/>
-                  </svg>
+                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                 </div>
                 <p class="dropzone-title">Arraste o logotipo aqui</p>
                 <p class="dropzone-hint">ou <strong>clique para selecionar</strong> · PNG, JPG ou SVG · máx 2 MB</p>
@@ -214,7 +149,7 @@
         </div>
       </section>
 
-      <!-- ---------- 1 · INCISO I ---------- -->
+      <!-- ============ 1 · INCISO I ============ -->
       <section data-panel="1" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -233,15 +168,16 @@
         </div>
       </section>
 
-      <!-- ---------- 2 · INCISO II ---------- -->
+      <!-- ============ 2 · INCISO II (PCA + ENQUADRAMENTO v2.6) ============ -->
       <section data-panel="2" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
             <span class="badge badge-inciso">Art. 18, § 1º, II</span>
-            <h2 class="panel-title">Alinhamento ao Plano de Contratações Anual (PCA)</h2>
-            <p class="panel-desc">Demonstração da compatibilidade com o PCA e o planejamento estratégico do órgão.</p>
+            <h2 class="panel-title">Alinhamento ao PCA e Enquadramento Orçamentário</h2>
+            <p class="panel-desc">Compatibilidade com o PCA, dotação, fonte de recurso, modalidade e critério de julgamento.</p>
           </div>
         </div>
+
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <div>
             <label class="lbl">Demanda prevista no PCA?</label>
@@ -254,9 +190,42 @@
           <div class="sm:col-span-2"><label class="lbl">Item / Código do PCA</label><input id="pcaItem" class="inp" /></div>
         </div>
         <div><label class="lbl">Justificativa do Alinhamento</label><textarea id="pcaJustificativa" class="ta"></textarea></div>
+
+        <!-- v2.6 · Enquadramento orçamentário / legal -->
+        <div class="mt-4">
+          <label class="lbl">Enquadramento Orçamentário e Legal</label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <div class="sm:col-span-2"><label class="lbl">Dotação Orçamentária</label><input id="dotacaoOrcamentaria" class="inp" placeholder="Ex.: 04.122.0032.2000.0001" /></div>
+            <div><label class="lbl">Fonte de Recurso</label><input id="fonteRecurso" class="inp" placeholder="Ex.: 1.500.000 — Tesouro" /></div>
+            <div>
+              <label class="lbl">Modalidade Pretendida</label>
+              <select id="modalidadePretendida" class="sel">
+                <option value="">— selecione —</option>
+                <option>Pregão Eletrônico</option>
+                <option>Concorrência Eletrônica</option>
+                <option>Dispensa Eletrônica</option>
+                <option>Inexigibilidade</option>
+                <option>Leilão</option>
+                <option>Diálogo Competitivo</option>
+              </select>
+            </div>
+            <div class="sm:col-span-2">
+              <label class="lbl">Critério de Julgamento</label>
+              <select id="criterioJulgamento" class="sel">
+                <option value="">— selecione —</option>
+                <option>Menor Preço</option>
+                <option>Maior Desconto</option>
+                <option>Melhor Técnica ou Conteúdo Artístico</option>
+                <option>Técnica e Preço</option>
+                <option>Maior Lance</option>
+                <option>Maior Retorno Econômico</option>
+              </select>
+            </div>
+          </div>
+        </div>
       </section>
 
-      <!-- ---------- 3 · INCISO III ---------- -->
+      <!-- ============ 3 · INCISO III ============ -->
       <section data-panel="3" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -284,7 +253,7 @@
         </div>
       </section>
 
-      <!-- ---------- 4 · INCISO IV ---------- -->
+      <!-- ============ 4 · INCISO IV (QTD + descrição v2.6) ============ -->
       <section data-panel="4" class="panel hidden">
         <div class="panel-head row-between">
           <div class="panel-head-left">
@@ -294,6 +263,12 @@
           </div>
           <button class="btn btn-ghost" onclick="addQtd()">+ Item</button>
         </div>
+
+        <div>
+          <label class="lbl">Descrição Quantitativa Extraída do DFD</label>
+          <textarea id="qtdDescricao" class="ta ta-sm" placeholder="Ex.: 30 (trinta) workstations e 20 (vinte) notebooks para o parque tecnológico"></textarea>
+        </div>
+
         <div class="table-wrap">
           <table class="grid-table">
             <thead><tr><th style="width:8%">Item</th><th style="width:26%">Descrição</th><th style="width:10%">Qtd.</th><th style="width:10%">Unid.</th><th style="width:38%">Memória de Cálculo</th><th style="width:8%"></th></tr></thead>
@@ -303,7 +278,7 @@
         <div><label class="lbl">Metodologia Geral da Estimativa</label><textarea id="metodoQtd" class="ta ta-sm"></textarea></div>
       </section>
 
-      <!-- ---------- 5 · INCISO V ---------- -->
+      <!-- ============ 5 · INCISO V ============ -->
       <section data-panel="5" class="panel hidden">
         <div class="panel-head row-between">
           <div class="panel-head-left">
@@ -322,7 +297,7 @@
         <div><label class="lbl">Conclusão do Levantamento de Mercado</label><textarea id="conclusaoMercado" class="ta ta-sm"></textarea></div>
       </section>
 
-      <!-- ---------- 6 · INCISO VI ---------- -->
+      <!-- ============ 6 · INCISO VI ============ -->
       <section data-panel="6" class="panel hidden">
         <div class="panel-head row-between">
           <div class="panel-head-left">
@@ -358,7 +333,7 @@
         </div>
       </section>
 
-      <!-- ---------- 7 · INCISO VII ---------- -->
+      <!-- ============ 7 · INCISO VII (solução + prazos v2.6) ============ -->
       <section data-panel="7" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -372,9 +347,16 @@
           <div><label class="lbl">Entregas (Deliverables) e Prazos</label><textarea id="entregas" class="ta ta-sm"></textarea></div>
           <div><label class="lbl">Ciclo de Vida e Sustentabilidade</label><textarea id="cicloVida" class="ta ta-sm"></textarea></div>
         </div>
+
+        <!-- v2.6 · Prazos e condições -->
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+          <div><label class="lbl">Prazo de Execução</label><input id="prazoExecucao" class="inp" placeholder="Ex.: 12 meses"></div>
+          <div><label class="lbl">Local de Entrega</label><input id="localEntrega" class="inp" placeholder="Ex.: Almoxarifado Central"></div>
+          <div><label class="lbl">Condições de Pagamento</label><input id="condicoesPagamento" class="inp" placeholder="Ex.: 30 dias após entrega"></div>
+        </div>
       </section>
 
-      <!-- ---------- 8 · INCISO VIII ---------- -->
+      <!-- ============ 8 · INCISO VIII ============ -->
       <section data-panel="8" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -397,7 +379,7 @@
         <div><label class="lbl">Fundamentação da Decisão</label><textarea id="justificativaParcelamento" class="ta"></textarea></div>
       </section>
 
-      <!-- ---------- 9 · INCISO IX ---------- -->
+      <!-- ============ 9 · INCISO IX ============ -->
       <section data-panel="9" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -413,7 +395,7 @@
         </div>
       </section>
 
-      <!-- ---------- 10 · INCISO X ---------- -->
+      <!-- ============ 10 · INCISO X ============ -->
       <section data-panel="10" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -429,7 +411,7 @@
         <div><label class="lbl">Impacto da Não Realização das Providências</label><textarea id="impactoProvidencias" class="ta ta-sm"></textarea></div>
       </section>
 
-      <!-- ---------- 11 · INCISO XI ---------- -->
+      <!-- ============ 11 · INCISO XI ============ -->
       <section data-panel="11" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -441,16 +423,14 @@
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           <div>
             <label class="lbl">Posicionamento *</label>
-            <select id="posicionamento" class="sel">
-              <option>Viável</option><option>Viável com ressalvas</option><option>Inviável</option>
-            </select>
+            <select id="posicionamento" class="sel"><option>Viável</option><option>Viável com ressalvas</option><option>Inviável</option></select>
           </div>
           <div class="sm:col-span-2"><label class="lbl">Recomendações e Condicionantes</label><input id="recomendacoes" class="inp" /></div>
         </div>
         <div><label class="lbl">Conclusão Técnica Fundamentada *</label><textarea id="conclusao" class="ta"></textarea></div>
       </section>
 
-      <!-- ---------- 12 · APROVADORES ---------- -->
+      <!-- ============ 12 · APROVADORES + GOVERNANÇA v2.6 ============ -->
       <section data-panel="12" class="panel hidden">
         <div class="panel-head row-between">
           <div class="panel-head-left">
@@ -460,13 +440,20 @@
           </div>
           <button class="btn btn-ghost" onclick="addAprovador()">+ Agente</button>
         </div>
+
+        <!-- v2.6 · Governança contratual -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-3">
+          <div><label class="lbl">Fiscal Titular do Contrato</label><input id="fiscalTitular" class="inp" placeholder="Nome e matrícula"></div>
+          <div><label class="lbl">Fiscal Substituto</label><input id="fiscalSubstituto" class="inp" placeholder="Nome e matrícula"></div>
+          <div><label class="lbl">Gestor do Contrato</label><input id="gestorContrato" class="inp" placeholder="Nome e matrícula"></div>
+        </div>
+
         <div id="listaAprovadores" class="aprov-list"></div>
       </section>
 
     </div>
 
-    <div class="nav-bar flex flex-col-reverse sm:flex-row items-stretch sm:items-center
-                justify-between gap-2 sm:gap-3 mt-4 sm:mt-6">
+    <div class="nav-bar flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 mt-4 sm:mt-6">
       <button id="btnVoltar" class="btn btn-ghost" onclick="goTo(current-1)">← Voltar</button>
       <div class="nav-bar-right flex flex-col sm:flex-row gap-2">
         <button id="btnProximo" class="btn btn-primary" onclick="goTo(current+1)">Próximo →</button>
@@ -476,62 +463,31 @@
   </main>
 </div>
 
-<!-- ============================ MODAL: WELCOME ============================ -->
+<!-- ============ MODAL WELCOME ============ -->
 <div class="modal-overlay" id="welcomeModal" aria-hidden="true">
   <div class="modal modal-welcome" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
     <div class="modal-welcome-hero">
       <div class="modal-welcome-logo" id="welcomeLogo"></div>
-      <span class="modal-welcome-badge">LicitaETP v2.1</span>
+      <span class="modal-welcome-badge">LicitaETP v2.6</span>
     </div>
     <h2 class="modal-title" id="welcomeTitle">Bem-vindo ao LicitaETP</h2>
-    <p class="modal-subtitle">
-      Sistema de elaboração do <strong>Estudo Técnico Preliminar</strong> em conformidade
-      com o <strong>art. 18, § 1º, da Lei nº 14.133/2021</strong> — integrado ao ecossistema
-      <em>LicitaReq</em> e <em>LicitaAudit</em>.
-    </p>
+    <p class="modal-subtitle">Sistema de elaboração do <strong>Estudo Técnico Preliminar</strong> em conformidade com o <strong>art. 18, § 1º, da Lei nº 14.133/2021</strong> — integrado ao ecossistema <em>LicitaReq</em> e <em>LicitaAudit</em>.</p>
 
     <div class="modal-welcome-grid">
-      <div class="welcome-card">
-        <div class="welcome-card-icon" style="background:rgba(59,130,246,.15);color:#3B82F6">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><polyline points="7 11 12 16 17 11"/><path d="M5 21h14"/></svg>
-        </div>
-        <h4>Importação de DFD</h4>
-        <p>Arraste um DFD (PDF ou JSON do LicitaReq) e o ETP é pré-preenchido automaticamente.</p>
-      </div>
-      <div class="welcome-card">
-        <div class="welcome-card-icon" style="background:rgba(16,185,129,.15);color:#10B981">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-        </div>
-        <h4>11 Incisos Obrigatórios</h4>
-        <p>Wizard guiado com validação em tempo real do score de conformidade legal.</p>
-      </div>
-      <div class="welcome-card">
-        <div class="welcome-card-icon" style="background:rgba(245,158,11,.15);color:#F59E0B">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-        </div>
-        <h4>PDF Executivo Auditável</h4>
-        <p>Documento de 6 blocos com TAG exclusiva e hash SHA-256 para o LicitaAudit.</p>
-      </div>
-      <div class="welcome-card">
-        <div class="welcome-card-icon" style="background:rgba(139,92,246,.15);color:#8B5CF6">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
-        </div>
-        <h4>Salvar / Carregar</h4>
-        <p>Guarde rascunhos em JSON e continue depois exatamente de onde parou.</p>
-      </div>
+      <div class="welcome-card"><div class="welcome-card-icon" style="background:rgba(59,130,246,.15);color:#3B82F6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><polyline points="7 11 12 16 17 11"/><path d="M5 21h14"/></svg></div><h4>Importação de DFD</h4><p>Arraste um DFD (PDF ou JSON do LicitaReq) e o ETP é pré-preenchido automaticamente — inclusive enquadramento, prazos e governança.</p></div>
+      <div class="welcome-card"><div class="welcome-card-icon" style="background:rgba(16,185,129,.15);color:#10B981"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><h4>11 Incisos Obrigatórios</h4><p>Wizard guiado com validação em tempo real do score de conformidade legal.</p></div>
+      <div class="welcome-card"><div class="welcome-card-icon" style="background:rgba(245,158,11,.15);color:#F59E0B"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><h4>PDF Executivo Auditável</h4><p>Documento com TAG exclusiva e hash SHA-256 para o LicitaAudit.</p></div>
+      <div class="welcome-card"><div class="welcome-card-icon" style="background:rgba(139,92,246,.15);color:#8B5CF6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg></div><h4>Salvar / Carregar</h4><p>Guarde rascunhos em JSON e continue depois exatamente de onde parou.</p></div>
     </div>
 
     <div class="modal-welcome-footer">
-      <label class="chk-inline">
-        <input type="checkbox" id="welcomeDontShow" />
-        <span>Não me mostrar novamente</span>
-      </label>
+      <label class="chk-inline"><input type="checkbox" id="welcomeDontShow" /><span>Não me mostrar novamente</span></label>
       <button class="btn btn-accent" onclick="fecharWelcome()">Começar agora →</button>
     </div>
   </div>
 </div>
 
-<!-- ============================ MODAL: IMPORTAR DFD ============================ -->
+<!-- ============ MODAL DFD ============ -->
 <div class="modal-overlay" id="dfdModal" aria-hidden="true">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dfdTitle">
     <div class="modal-head">
@@ -540,32 +496,20 @@
         <h2 class="modal-title" id="dfdTitle">Importar DFD (PDF ou JSON)</h2>
         <p class="modal-subtitle">Carregue o Documento de Formalização da Demanda e o ETP será preenchido automaticamente.</p>
       </div>
-      <button class="btn-icon-close" onclick="fecharImportarDFD()" aria-label="Fechar">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      <button class="btn-icon-close" onclick="fecharImportarDFD()" aria-label="Fechar"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
     </div>
-
     <div class="dropzone dropzone-lg" id="dfdDropzone">
       <input type="file" id="dfdFile" accept=".pdf,.json,application/pdf,application/json" hidden />
       <div class="dropzone-empty">
-        <div class="dropzone-icon">
-          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3v13"/><polyline points="7 11 12 16 17 11"/><path d="M5 21h14"/>
-          </svg>
-        </div>
+        <div class="dropzone-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><polyline points="7 11 12 16 17 11"/><path d="M5 21h14"/></svg></div>
         <p class="dropzone-title">Arraste o arquivo do DFD aqui</p>
         <p class="dropzone-hint">ou <strong>clique para selecionar</strong> · aceita <b>PDF</b> e <b>JSON</b></p>
       </div>
     </div>
-
     <div id="dfdResult" class="dfd-result hidden">
-      <div class="dfd-result-head">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ok)"><path d="M20 6L9 17l-5-5"/></svg>
-        <strong id="dfdResultMsg">Campos identificados com sucesso</strong>
-      </div>
+      <div class="dfd-result-head"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="color:var(--ok)"><path d="M20 6L9 17l-5-5"/></svg><strong id="dfdResultMsg">Campos identificados com sucesso</strong></div>
       <ul class="dfd-result-list" id="dfdResultList"></ul>
     </div>
-
     <div class="modal-actions">
       <button class="btn btn-ghost" onclick="fecharImportarDFD()">Cancelar</button>
       <button class="btn btn-accent" id="dfdApplyBtn" onclick="aplicarImportacaoDFD()" disabled>Aplicar ao ETP</button>
@@ -574,7 +518,6 @@
 </div>
 
 <div id="toast" class="toast"></div>
-
 <script src="app.js"></script>
 </body>
 </html>
