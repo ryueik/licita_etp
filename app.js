@@ -1,7 +1,7 @@
 /* =====================================================================
-   LICITAETP v2.4 — NÚCLEO COMPLETO
+   LICITAETP v2.5 — NÚCLEO COMPLETO
    Estudo Técnico Preliminar · Lei nº 14.133/2021
-   Parser DFD robusto + Captura de Logo institucional do PDF
+   Parser DFD posicional + Captura de Logo do PDF + Delimitação Estrita
    ===================================================================== */
 'use strict';
 
@@ -541,7 +541,7 @@ function extrairPorRotulo(texto, rotulos, opts = {}){
   const linhas = String(texto).split('\n');
 
   for (const rotulo of rotulos){
-    const rotEsc = String(rotulo).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const rotEsc = escapeRegex(rotulo);
     const rxRot = new RegExp(`^\\s*${rotEsc}\\s*[:\\-–—|]?\\s*(.*)$`, 'i');
 
     for (let i = 0; i < linhas.length; i++){
@@ -564,17 +564,39 @@ function extrairPorRotulo(texto, rotulos, opts = {}){
   return '';
 }
 
-/* ---------- 10.5 · EXTRAÇÃO DE BLOCO ---------- */
+/* ---------- 10.5 · EXTRAÇÃO DE BLOCO (com truncamento universal) ---------- */
 function extrairBloco(texto, rotulo, rotulosFim, opts = {}){
   const { maxLen = 2000 } = opts;
-  const esc_rot = rotulo.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const altFim = (rotulosFim || []).map(r => r.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-  const rx = altFim
-    ? new RegExp(`(?:^|\\n)\\s*${esc_rot}\\s*[:\\-–—|]?\\s*([\\s\\S]{0,${maxLen}}?)(?=\\n\\s*(?:${altFim})\\s*[:\\-–—|]|\\n\\s*\\[\\[PAGINA|$)`, 'i')
-    : new RegExp(`(?:^|\\n)\\s*${esc_rot}\\s*[:\\-–—|]?\\s*([\\s\\S]{0,${maxLen}})`, 'i');
+  const esc_rot = escapeRegex(rotulo);
+  const rx = new RegExp(
+    `(?:^|\\n)\\s*${esc_rot}\\s*[:\\-–—|]?\\s*([\\s\\S]{0,${maxLen}})`,
+    'i'
+  );
   const m = texto.match(rx);
   if (!m || !m[1]) return '';
-  return cleanValue(m[1]).slice(0, maxLen);
+
+  const linhas   = m[1].split('\n');
+  const alvosFim = (rotulosFim || []).map(normBusca);
+  const aceitas  = [];
+
+  for (const linha of linhas){
+    const norm = normBusca(linha);
+    if (!norm) continue;
+
+    if (alvosFim.some(a =>
+          norm === a ||
+          norm.startsWith(a + ' ') ||
+          norm.startsWith(a + ':'))) break;
+
+    if (ehStopLabelUniversal(norm)) break;
+
+    if (norm.startsWith('[[pagina_')) break;
+
+    aceitas.push(linha);
+    if (aceitas.join(' ').length > maxLen) break;
+  }
+
+  return cleanValue(aceitas.join(' ')).slice(0, maxLen);
 }
 
 /* ---------- 10.6 · NORMALIZAÇÃO MONETÁRIA ---------- */
@@ -589,11 +611,7 @@ function normalizarMoeda(v){
 }
 
 /* =====================================================================
-   10.7 · EXTRAÇÃO DE IMAGENS (LOGO) DA PÁGINA 1 DO PDF — v2.5
-   =====================================================================
-   - Cobre paintImageXObject, paintJpegXObject e paintInlineImageXObject
-   - Resolve objetos com timeout de segurança (evita hangs)
-   - Rejeita ícones, tarjas e imagens > 800 KB base64
+   10.7 · EXTRAÇÃO DE IMAGENS (LOGO) DO PDF — v2.5
    ===================================================================== */
 async function extrairLogoDoPdf(file){
   if (!window.pdfjsLib) return null;
@@ -633,7 +651,6 @@ async function extrairLogoDoPdf(file){
       if (fn === pdfjsLib.OPS.paintInlineImageXObject && args[0]) inlineImgs.push(args[0]);
     }
 
-    /* -------- Resolve XObjects por nome -------- */
     for (const nome of nomesXObj){
       const obj = await new Promise(resolve => {
         let done = false;
@@ -652,7 +669,6 @@ async function extrairLogoDoPdf(file){
       }
     }
 
-    /* -------- Inline images (já vêm como objeto) -------- */
     for (const obj of inlineImgs){
       if (obj && obj.width && obj.height && obj.data){
         candidatos.push({ obj, pagina: p, fonte: 'inline' });
@@ -666,16 +682,16 @@ async function extrairLogoDoPdf(file){
   for (const c of candidatos){
     const { width, height, data } = c.obj;
     if (!width || !height || !data) continue;
-    if (width  < 24 || height < 24) continue;      // ignora ícones
-    if (width > 1200 || height > 1200) continue;   // ignora grandes
+    if (width  < 24 || height < 24) continue;
+    if (width > 1200 || height > 1200) continue;
     const ratio = width / height;
-    if (ratio < 0.15 || ratio > 6) continue;       // ignora tarjas
+    if (ratio < 0.15 || ratio > 6) continue;
     const area = width * height;
     if (area < 2000) continue;
 
     const dataUrl = bitmapParaDataUrl(c.obj);
     if (!dataUrl) continue;
-    if (dataUrl.length > 800 * 1024) continue;     // >800 KB → provavelmente foto
+    if (dataUrl.length > 800 * 1024) continue;
 
     validos.push({ dataUrl, width, height, area, pagina: c.pagina, fonte: c.fonte });
   }
@@ -731,11 +747,108 @@ function bitmapParaDataUrl(imgObj){
 
 /* =====================================================================
    10.8 · CONSTRUÇÃO DA GRADE DE CÉLULAS (TABELA-AWARE)
-   =====================================================================
-   Cada página vira uma lista de "células" posicionadas em (x, y).
-   Itens de texto com gap horizontal < 15pt na mesma linha são fundidos
-   na mesma célula (evita "ÓRGÃO" + "/" + "ENTIDADE" separados).
    ===================================================================== */
+
+/* ---------- 10.8.1 · LABELS UNIVERSAIS DE PARADA ----------
+   Qualquer bloco de texto (objeto, justificativa, etc.) PARA imediatamente
+   ao encontrar uma destas linhas. Impede vazamento entre seções do DFD. */
+const STOP_LABELS_UNIVERSAL_RAW = [
+  /* --- Seções típicas do DFD/ETP --- */
+  'Justificativa da Necessidade',
+  'Justificativa da Necessidade Pública',
+  'Justificativa da Necessidade Pública (Fundamentada)',
+  'Justificativa da Demanda',
+  'Justificativa da Contratação',
+  'Justificativa',
+  'Estimativa de Quantidades',
+  'Estimativa de Quantidade',
+  'Estimativa de Quantidades e Memória de Cálculo',
+  'Alinhamento ao Plano',
+  'Alinhamento ao Plano de Contratações Anual',
+  'Alinhamento ao PCA',
+  'Enquadramento Legal',
+  'Fundamentação Legal',
+  'Fundamentacao Legal',
+  'Requisitos da Contratação',
+  'Requisitos da Contratacao',
+  'Levantamento de Mercado',
+  'Levantamento de Mercado e Alternativas',
+  'Estimativa Preliminar de Preços',
+  'Estimativa de Preços',
+  'Estimativa de Precos',
+  'Descrição da Solução',
+  'Descricao da Solucao',
+  'Descrição da Solução como um Todo',
+  'Justificativa para Parcelamento',
+  'Justificativa para Parcelamento (ou não)',
+  'Resultados Pretendidos',
+  'Providências Prévias',
+  'Providencias Previas',
+  'Providências Prévias e Contratações Correlatas',
+  'Posicionamento Conclusivo',
+  'Posicionamento Conclusivo sobre a Viabilidade',
+
+  /* --- Campos de identificação (bloqueiam qualquer bloco) --- */
+  'Órgão / Entidade',
+  'Órgão/Entidade',
+  'Órgão Entidade',
+  'UASG',
+  'UASG / Código',
+  'Unidade Requisitante',
+  'Unidade Demandante',
+  'Unidade Solicitante',
+  'Setor Requisitante',
+  'Setor Demandante',
+  'Setor Solicitante',
+  'Unidade / Setor',
+  'Unidade / Setor Demandante',
+  'Responsável pela Demanda',
+  'Responsável da Demanda',
+  'Responsável Técnico',
+  'Responsável pela Elaboração',
+  'Responsável pela Solicitação',
+  'Responsável',
+  'Cargo / Função',
+  'Cargo/Função',
+  'Cargo e Função',
+  'Cargo ou Função',
+  'Cargo',
+  'Função',
+  'Valor Estimado',
+  'Valor Estimado da Contratação',
+  'Valor Total',
+  'Valor Total Estimado',
+  'Valor Global',
+  'Valor',
+  'Processo Administrativo',
+  'Nº do Processo',
+  'Número do Processo',
+  'Processo',
+  'Nº do DFD',
+  'Número do DFD',
+  'DFD',
+  'Data de Elaboração',
+  'Data'
+];
+
+const STOP_LABELS_UNIVERSAL = STOP_LABELS_UNIVERSAL_RAW.map(normBusca);
+
+/** Escapa string para uso seguro em RegExp. */
+function escapeRegex(s){
+  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+/** Retorna true se o texto normalizado é (ou começa com) um stop-label universal. */
+function ehStopLabelUniversal(norm){
+  if (!norm) return false;
+  for (const alvo of STOP_LABELS_UNIVERSAL){
+    if (norm === alvo) return true;
+    if (norm.startsWith(alvo + ' ')) return true;
+    if (norm.startsWith(alvo + ':')) return true;
+  }
+  return false;
+}
+
 function construirCelulas(paginas){
   const celulas = [];
 
@@ -814,12 +927,10 @@ function buscarLabelCelula(celulas, rotulos){
  * Extrai valor de um label SEM CONCATENAR COLUNAS:
  *   1) célula à direita na MESMA linha
  *   2) célula ABAIXO na MESMA faixa de X (até 90pt)
- * Para no primeiro label conhecido encontrado.
  */
 function extrairValorDeLabel(celulas, labelCel){
   if (!labelCel) return '';
 
-  /* (1) mesma linha, à direita */
   const direita = celulas
     .filter(c => c.page === labelCel.page
               && Math.abs(c.y - labelCel.y) < 3.5
@@ -832,7 +943,6 @@ function extrairValorDeLabel(celulas, labelCel){
     if (val) return val;
   }
 
-  /* (2) abaixo, mesma faixa X */
   const x0 = labelCel.x - 15;
   const x1 = labelCel.x + Math.max(280, labelCel.w + 260);
   const abaixo = celulas
@@ -844,7 +954,6 @@ function extrairValorDeLabel(celulas, labelCel){
 
   for (const c of abaixo){
     if (ehLabelVisual(c.text)) continue;
-    // Se for outro label de campo, para.
     if (buscarLabelCelula([c], [
       'órgão','entidade','unidade','uasg','setor','responsável',
       'cargo','função','valor','processo','exercício','data'
@@ -855,11 +964,12 @@ function extrairValorDeLabel(celulas, labelCel){
   return '';
 }
 
-/** Extrai bloco de texto longo (ex.: justificativa) SEM vazar para coluna vizinha. */
+/** Extrai bloco de texto longo SEM vazar para outras seções (stop universal incluso). */
 function extrairBlocoColuna(celulas, labelCel, rotulosFim){
   if (!labelCel) return '';
+
   const x0 = labelCel.x - 15;
-  const x1 = labelCel.x + 420;
+  const x1 = labelCel.x + 640;
   const alvosFim = (rotulosFim || []).map(normBusca);
 
   const abaixo = celulas
@@ -871,9 +981,15 @@ function extrairBlocoColuna(celulas, labelCel, rotulosFim){
   const partes = [];
   for (const c of abaixo){
     const norm = normBusca(c.text);
-    if (alvosFim.some(a => norm === a || norm.startsWith(a + ' ') || norm.startsWith(a + ':'))){
-      break;
-    }
+    if (!norm) continue;
+
+    if (alvosFim.some(a =>
+          norm === a ||
+          norm.startsWith(a + ' ') ||
+          norm.startsWith(a + ':'))) break;
+
+    if (ehStopLabelUniversal(norm)) break;
+
     if (buscarLabelCelula([c], [
       'órgão','entidade','unidade requisitante','unidade demandante',
       'setor requisitante','setor demandante','uasg',
@@ -1052,7 +1168,6 @@ async function extrairDFDPdf(file){
     });
     paginas.push({ pageNum: i, items });
 
-    // Texto plano (compat com extrairBloco/extrairPorRotulo)
     const porLinha = new Map();
     items.forEach(it => {
       const yy = Math.round(it.y / 2) * 2;
@@ -1163,21 +1278,42 @@ function extrairCamposDFD(texto, paginas){
     if (m) campos.numero = cleanValue(m[1]).replace(/\s*\/\s*/, '/');
   }
 
-  /* ---------- Objeto (texto longo) ---------- */
+  /* ---------- Objeto (texto longo, delimitação estrita) ---------- */
   {
+    const STOP_OBJETO = [
+      'Justificativa da Necessidade',
+      'Justificativa da Necessidade Pública',
+      'Justificativa da Necessidade Pública (Fundamentada)',
+      'Justificativa da Demanda',
+      'Justificativa da Contratação',
+      'Justificativa',
+      'Estimativa de Quantidades',
+      'Estimativa de Quantidade',
+      'Alinhamento ao Plano',
+      'Alinhamento ao PCA',
+      'Enquadramento Legal',
+      'Fundamentação Legal',
+      'Requisitos da Contratação',
+      'Levantamento de Mercado',
+      'Estimativa Preliminar de Preços',
+      'Estimativa de Preços',
+      'Descrição da Solução',
+      'Justificativa para Parcelamento',
+      'Resultados Pretendidos',
+      'Providências Prévias',
+      'Posicionamento Conclusivo'
+    ];
+
     const labelObj = buscarLabelCelula(celulas, [
       'Descrição Resumida do Objeto','Descrição do Objeto',
+      'Descrição do Objeto da Contratação',
       'Objeto da Contratação','Objeto da Contratacao',
-      'Objeto da Demanda','Objeto'
+      'Objeto da Demanda','Objeto da Necessidade','Objeto'
     ]);
+
     if (labelObj){
       const inline = extrairValorDeLabel(celulas, labelObj);
-      const bloco  = extrairBlocoColuna(celulas, labelObj, [
-        'Justificativa da Necessidade','Justificativa da Demanda','Justificativa',
-        'Unidade Requisitante','Unidade Demandante','Setor Requisitante',
-        'Setor Demandante','Responsável','Cargo / Função','Cargo/Função',
-        'Valor Estimado','Valor Total','Valor Global','Processo'
-      ]);
+      const bloco  = extrairBlocoColuna(celulas, labelObj, STOP_OBJETO);
       campos.objeto = (bloco && bloco.length > (inline || '').length)
         ? bloco.slice(0, 1500)
         : (inline || '').slice(0, 1500);
@@ -1185,56 +1321,68 @@ function extrairCamposDFD(texto, paginas){
     if (!campos.objeto){
       const inicio = [
         'Descrição Resumida do Objeto','Descrição do Objeto',
+        'Descrição do Objeto da Contratação',
         'Objeto da Contratação','Objeto da Demanda','Objeto'
       ];
-      const fim = [
-        'Justificativa da Necessidade','Justificativa',
-        'Unidade Requisitante','Unidade Demandante',
-        'Setor Requisitante','Setor Demandante',
-        'Responsável pela Demanda','Responsável Técnico','Responsável',
-        'Valor Estimado','Valor Global','Valor',
-        'Cargo / Função','Cargo/Função','Cargo','Função',
-        'Processo Administrativo','Processo'
-      ];
       for (const rot of inicio){
-        const b = extrairBloco(t, rot, fim, { maxLen: 1500 });
+        const b = extrairBloco(t, rot, STOP_OBJETO, { maxLen: 1500 });
         if (b && b.length > 5){ campos.objeto = b; break; }
       }
     }
   }
 
-  /* ---------- Justificativa (texto longo) ---------- */
+  /* ---------- Justificativa (texto longo, delimitação estrita) ---------- */
   {
+    const STOP_JUST = [
+      'Estimativa de Quantidades',
+      'Estimativa de Quantidade',
+      'Estimativa de Quantidades e Memória de Cálculo',
+      'Alinhamento ao Plano',
+      'Alinhamento ao PCA',
+      'Enquadramento Legal',
+      'Fundamentação Legal',
+      'Requisitos da Contratação',
+      'Levantamento de Mercado',
+      'Estimativa Preliminar de Preços',
+      'Estimativa de Preços',
+      'Descrição da Solução',
+      'Justificativa para Parcelamento',
+      'Resultados Pretendidos',
+      'Providências Prévias',
+      'Posicionamento Conclusivo',
+      'Unidade Requisitante','Unidade Demandante',
+      'Setor Requisitante','Setor Demandante',
+      'Responsável pela Demanda','Responsável Técnico','Responsável',
+      'Valor Estimado','Valor Global','Valor',
+      'Cargo / Função','Cargo/Função','Cargo','Função',
+      'Processo Administrativo','Processo',
+      'Servidores','Quantidade','Item','Prioridade','Prazo'
+    ];
+
     const labelJ = buscarLabelCelula(celulas, [
-      'Justificativa da Necessidade','Justificativa da Demanda',
-      'Justificativa da Contratação','Descrição da Necessidade','Justificativa'
+      'Justificativa da Necessidade Pública (Fundamentada)',
+      'Justificativa da Necessidade Pública',
+      'Justificativa da Necessidade',
+      'Justificativa da Demanda',
+      'Justificativa da Contratação',
+      'Descrição da Necessidade',
+      'Justificativa'
     ]);
     if (labelJ){
       const inline = extrairValorDeLabel(celulas, labelJ);
-      const bloco  = extrairBlocoColuna(celulas, labelJ, [
-        'Unidade Requisitante','Unidade Demandante','Setor Requisitante','Setor Demandante',
-        'Responsável pela Demanda','Responsável Técnico','Responsável',
-        'Valor Estimado','Valor Global','Valor',
-        'Cargo / Função','Cargo/Função','Cargo','Função',
-        'Processo Administrativo','Processo','Servidores','Quantidade','Item','Prioridade','Prazo'
-      ]);
+      const bloco  = extrairBlocoColuna(celulas, labelJ, STOP_JUST);
       campos.justificativa = (bloco && bloco.length > (inline || '').length)
         ? bloco.slice(0, 2000)
         : (inline || '').slice(0, 2000);
     }
     if (!campos.justificativa){
-      const fim = [
-        'Unidade Requisitante','Unidade Demandante','Setor Requisitante','Setor Demandante',
-        'Responsável pela Demanda','Responsável Técnico','Responsável',
-        'Valor Estimado','Valor Global','Valor',
-        'Cargo / Função','Cargo/Função','Cargo','Função',
-        'Processo Administrativo','Processo','Servidores','Quantidade','Item','Prioridade','Prazo'
-      ];
-      let j = extrairBloco(t, 'Justificativa da Necessidade', fim, { maxLen: 2000 });
-      if (!j) j = extrairBloco(t, 'Justificativa da Contratação', fim, { maxLen: 2000 });
-      if (!j) j = extrairBloco(t, 'Justificativa', fim, { maxLen: 2000 });
-      if (!j) j = extrairBloco(t, 'Descrição da Necessidade', fim, { maxLen: 2000 });
-      if (!j) j = extrairBloco(t, 'Necessidade', fim, { maxLen: 2000 });
+      let j = extrairBloco(t, 'Justificativa da Necessidade Pública (Fundamentada)', STOP_JUST, { maxLen: 2000 });
+      if (!j) j = extrairBloco(t, 'Justificativa da Necessidade Pública', STOP_JUST, { maxLen: 2000 });
+      if (!j) j = extrairBloco(t, 'Justificativa da Necessidade', STOP_JUST, { maxLen: 2000 });
+      if (!j) j = extrairBloco(t, 'Justificativa da Contratação', STOP_JUST, { maxLen: 2000 });
+      if (!j) j = extrairBloco(t, 'Justificativa', STOP_JUST, { maxLen: 2000 });
+      if (!j) j = extrairBloco(t, 'Descrição da Necessidade', STOP_JUST, { maxLen: 2000 });
+      if (!j) j = extrairBloco(t, 'Necessidade', STOP_JUST, { maxLen: 2000 });
       campos.justificativa = j;
     }
   }
@@ -1283,11 +1431,9 @@ function extrairCamposDFD(texto, paginas){
     const low = campos.cargo.toLowerCase().trim();
     if (['função','funcao','cargo','/','—','-','n/a'].includes(low)) campos.cargo = '';
   }
-  // Impede que Órgão e Unidade fiquem idênticos (sinal de vazamento)
   if (campos.unidade && campos.orgao && campos.unidade === campos.orgao){
     campos.unidade = '';
   }
-  // Impede que Unidade comece com o Órgão (vazamento de coluna)
   if (campos.unidade && campos.orgao
       && normBusca(campos.unidade).startsWith(normBusca(campos.orgao))){
     campos.unidade = campos.unidade.slice(campos.orgao.length).replace(/^[\s\-–—:]+/, '');
@@ -1316,7 +1462,6 @@ function aplicarImportacaoDFD(){
       if (el && v) el.value = String(v);
     };
 
-    /* ---------- Campos de identificação ---------- */
     if (c.objeto)        setV('objeto', c.objeto);
     if (c.unidade)       setV('unidade', c.unidade);
     if (c.responsavel)   setV('responsavel', c.responsavel);
@@ -1328,7 +1473,6 @@ function aplicarImportacaoDFD(){
     if (c.orgao)         setV('orgao', c.orgao);
     if (c.uasg)          setV('uasg', c.uasg);
 
-    /* ---------- Nº do DFD → justificativa do PCA ---------- */
     if (c.numero){
       const justEl = document.getElementById('pcaJustificativa');
       if (justEl && !justEl.value){
@@ -1336,7 +1480,6 @@ function aplicarImportacaoDFD(){
       }
     }
 
-    /* ---------- Valor estimado → 1ª linha da tabela de preços ---------- */
     if (c.valor){
       let primeiro = document.querySelector('#tbPreco tr');
       if (!primeiro){
@@ -1356,7 +1499,6 @@ function aplicarImportacaoDFD(){
       }
     }
 
-    /* ---------- Logo herdada do DFD / JSON ---------- */
     let origemLogo = 'default';
     if (dfdExtraido.logo){
       aplicarLogoCapturada(dfdExtraido.logo, 'dfd');
@@ -1372,7 +1514,6 @@ function aplicarImportacaoDFD(){
     fecharImportarDFD();
     goTo(0);
 
-    /* ---------- Destaque visual temporário ---------- */
     setTimeout(() => {
       ['objeto','unidade','responsavel','cargoResponsavel','necessidade','processo','orgao']
         .forEach(id => {
@@ -1744,7 +1885,7 @@ function montarDocumento(d, conf, meta){
       author: d.id.orgao || 'LicitaETP',
       subject: 'ETP — Lei nº 14.133/2021, art. 18, § 1º',
       keywords: `ETP, Licitações, Lei 14.133/2021, ${meta.tag}`,
-      creator: 'LicitaETP v2.4'
+      creator: 'LicitaETP v2.5'
     },
     header: (cp, total) => {
       if (cp <= 3 || cp === total) return null;
@@ -1855,7 +1996,7 @@ async function exportarJSON(){
   const emitidoEm = new Date().toISOString();
   const hash = await sha256Hex(JSON.stringify({ etp:d, tag, emitidoEm }));
   const pacote = {
-    sistema:'LicitaETP', versao:'2.4.0', trilha:'LICITAETP', tipo:'auditoria',
+    sistema:'LicitaETP', versao:'2.5.0', trilha:'LICITAETP', tipo:'auditoria',
     tag, hash, emitidoEm,
     logo: logoDataUrl,
     logoOrigem,
@@ -1877,7 +2018,7 @@ async function exportarJSON(){
 function salvarRascunho(){
   try {
     const pacote = {
-      sistema:'LicitaETP', versao:'2.4.0', tipo:'rascunho',
+      sistema:'LicitaETP', versao:'2.5.0', tipo:'rascunho',
       salvoEm: new Date().toISOString(),
       logo: logoDataUrl,
       logoOrigem,
@@ -1969,7 +2110,6 @@ function inicializarDropzoneLogo(){
   if (!dz || !input) return;
   const empty = document.getElementById('logoDropzoneEmpty');
   const preview = document.getElementById('logoDropzonePreview');
-  const img = document.getElementById('logoPreviewImg');
   const nameEl = document.getElementById('logoPreviewName');
   const sizeEl = document.getElementById('logoPreviewSize');
   const removeBtn = document.getElementById('logoRemoveBtn');
@@ -2135,5 +2275,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /* =====================================================================
-   FIM — LicitaETP v2.4
+   FIM — LicitaETP v2.5
    ===================================================================== */
