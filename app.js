@@ -1995,15 +1995,24 @@ function toast(msg){
 }
 
 /* =====================================================================
-   21. BOOTSTRAP
+   Bootstrap OmniLicit · LicitaETP v5.0
    ===================================================================== */
 document.addEventListener('DOMContentLoaded', async () => {
   aplicarTema(lerTemaSalvo());
   injetarIdentidadeVisual();
 
-  try { logoPadraoPng = await svgToPngDataUrl(SVG_LOGO, 256); }
-  catch(e){ console.warn('Falha ao pré-renderizar logo padrão.', e); }
+  /* 1) Carrega a logo oficial da pasta raiz */
+  await OmniLogo.load();
+  const brand = document.getElementById('brandLogo');
+  if (brand && OmniLogo.get()) {
+    brand.innerHTML = `<img src="${OmniLogo.get()}" alt="OmniLicit"
+                             style="width:100%;height:100%;object-fit:contain" />`;
+  }
 
+  /* 2) Pré-carrega a logo padrão para o pdfMake */
+  try { logoPadraoPng = OmniLogo.get(); } catch (e) { console.warn(e); }
+
+  /* 3) Datas e painéis */
   const dtEl = document.getElementById('dataElaboracao');
   if (dtEl && !dtEl.value) dtEl.value = new Date().toISOString().slice(0, 10);
 
@@ -2011,21 +2020,22 @@ document.addEventListener('DOMContentLoaded', async () => {
   TOTAL  = panels.length;
 
   preencherNumeroETPInicial();
-  const numEl = document.getElementById('numeroEtp');
-  numEl?.addEventListener('input', marcarNumeroEditado);
-  const exEl = document.getElementById('exercicio');
-  exEl?.addEventListener('change', () => {
+  document.getElementById('numeroEtp')?.addEventListener('input', marcarNumeroEditado);
+  document.getElementById('exercicio')?.addEventListener('change', () => {
     if (!document.getElementById('numeroEtp').dataset.userEdited) preencherNumeroETPInicial();
   });
 
+  /* 4) Dropzones */
   inicializarDropzoneLogo();
   inicializarDropzoneDFD();
 
+  /* 5) JSON de rascunho */
   document.getElementById('jsonFile')?.addEventListener('change', e => {
     const f = e.target.files?.[0]; if (f) processarArquivoJSON(f);
     e.target.value = '';
   });
 
+  /* 6) Linhas dinâmicas */
   addQtd();
   addMercado(); addMercado();
   addPreco();
@@ -2035,6 +2045,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.target.closest('#tbPreco')) recalcularTotal();
   });
 
+  /* 7) Modais */
   document.querySelectorAll('.modal-overlay').forEach(m => {
     m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); });
   });
@@ -2045,23 +2056,110 @@ document.addEventListener('DOMContentLoaded', async () => {
   renderNav();
   goTo(0);
 
+  /* 8) Score em tempo real */
   setInterval(() => {
     const conf = calcularConformidade(coletarDados());
     const b = document.getElementById('scoreBadge');
     if (!b) return;
     b.textContent = `Conformidade ${conf.score}%`;
-    if (conf.score >= 80){
-      b.style.background = 'var(--ok-bg)'; b.style.color = 'var(--ok)'; b.style.borderColor = 'rgba(22,163,74,.35)';
-    } else if (conf.score >= 50){
-      b.style.background = 'var(--wa-bg)'; b.style.color = 'var(--wa)'; b.style.borderColor = 'rgba(217,119,6,.35)';
+    if (conf.score >= 80) {
+      b.style.background = 'var(--ok-bg)'; b.style.color = 'var(--ok)';
+      b.style.borderColor = 'rgba(22,163,74,.35)';
+    } else if (conf.score >= 50) {
+      b.style.background = 'var(--wa-bg)'; b.style.color = 'var(--wa)';
+      b.style.borderColor = 'rgba(217,119,6,.35)';
     } else {
-      b.style.background = 'var(--er-bg)'; b.style.color = 'var(--er)'; b.style.borderColor = 'rgba(220,38,38,.35)';
+      b.style.background = 'var(--er-bg)'; b.style.color = 'var(--er)';
+      b.style.borderColor = 'rgba(220,38,38,.35)';
     }
   }, 1200);
 
-  if (deveExibirWelcome()){ setTimeout(abrirWelcome, 500); }
+  if (deveExibirWelcome()) setTimeout(abrirWelcome, 500);
 });
 
+/* =====================================================================
+   gerarPDF() agora delega ao PDFEngine
+   ===================================================================== */
+async function gerarPDF() {
+  const d = coletarDados();
+  if (!d.id.orgao || !d.id.objeto) {
+    toast('Preencha ao menos Órgão/Entidade e Objeto na etapa de Identificação.');
+    goTo(0); return;
+  }
+
+  // Consome número sequencial do ETP se o usuário não editou
+  const exMatch = (d.id.exercicio || '').match(/\d{4}/);
+  const exercicio = exMatch ? exMatch[0] : String(new Date().getFullYear());
+  if (!d.id.numero || !document.getElementById('numeroEtp').dataset.userEdited) {
+    const novo = consumirNumeroETP(exercicio);
+    document.getElementById('numeroEtp').value = novo;
+    d.id.numero = novo;
+  }
+
+  const conf = calcularConformidade(d);
+  const arquivo = nomeArquivo();
+
+  try {
+    const { tag, hash } = await PDFEngine.gerar(d, conf, {
+      exercicio,
+      arquivoNome: arquivo,
+      logoDataUrl: OmniLogo.get()
+    });
+    toast(`PDF gerado: ${arquivo} · ${tag}`);
+  } catch (err) {
+    console.error('[PDFEngine]', err);
+    toast('Falha ao gerar PDF: ' + (err?.message || err));
+  }
+}
+
+/* =====================================================================
+   processarDFD() agora delega ao DFDParser
+   ===================================================================== */
+async function processarDFD(file) {
+  const msgEl = document.getElementById('dfdResultMsg');
+  const list  = document.getElementById('dfdResultList');
+  const box   = document.getElementById('dfdResult');
+  const btn   = document.getElementById('dfdApplyBtn');
+
+  try {
+    toast('Lendo DFD...');
+    const resultado = await DFDParser.parse(file);
+
+    let logoCapturada = null;
+    if ((file.name || '').toLowerCase().endsWith('.pdf')) {
+      toast('Capturando logotipo institucional...');
+      try { logoCapturada = await extrairLogoDoPdf(file); } catch (e) { console.warn(e); }
+    }
+    dfdExtraido = { ...resultado, logo: logoCapturada };
+
+    const campos = Object.entries(resultado.campos).filter(([_, v]) => v && String(v).trim());
+    if (!campos.length && !logoCapturada) { toast('Nenhum campo reconhecido no arquivo.'); return; }
+
+    msgEl.textContent = `${campos.length} campo(s) via ${resultado.origem.toUpperCase()}${logoCapturada ? ' + logotipo' : ''}`;
+    list.innerHTML = campos.map(([k, v]) => {
+      const label = {
+        numero:'Nº do DFD', objeto:'Objeto', unidade:'Unidade Requisitante',
+        responsavel:'Responsável', cargo:'Cargo / Função', email:'E-mail',
+        telefone:'Telefone', valor:'Valor Estimado', justificativa:'Justificativa',
+        processo:'Processo', orgao:'Órgão', uasg:'UASG', data:'Data',
+        pcaItem:'Item do PCA', pcaPrevisto:'Previsão no PCA',
+        dotacao:'Dotação', fonteRecurso:'Fonte', modalidade:'Modalidade',
+        criterio:'Critério de Julgamento', prazoExecucao:'Prazo de Execução',
+        localEntrega:'Local de Entrega', condicoesPagamento:'Condições de Pagamento',
+        fiscalTitular:'Fiscal Titular', fiscalSubstituto:'Fiscal Substituto',
+        gestorContrato:'Gestor do Contrato', qtdDescricao:'Quantitativo'
+      }[k] || k;
+      const val = String(v).length > 140 ? String(v).slice(0, 137) + '…' : String(v);
+      return `<li><span>${esc(label)}</span><span>${esc(val)}</span></li>`;
+    }).join('');
+
+    box.classList.remove('hidden');
+    btn.disabled = false;
+  } catch (e) {
+    console.error('[DFD]', e);
+    toast('Falha ao ler o DFD: ' + (e?.message || e));
+  }
+}
 /* =====================================================================
    FIM — LicitaETP v2.6
    ===================================================================== */
