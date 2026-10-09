@@ -1,5 +1,5 @@
 /* =====================================================================
-   LICITAETP v2.0 — NÚCLEO COMPLETO
+   LICITAETP v2.1 — NÚCLEO COMPLETO
    Estudo Técnico Preliminar · Lei nº 14.133/2021
    ===================================================================== */
 'use strict';
@@ -13,21 +13,21 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 
 /* =====================================================================
-   1. LOGO / FAVICON SVG VERDE
+   1. LOGO / FAVICON SVG — FUNDO VERDE + LETRAS BRANCAS
    ===================================================================== */
 const SVG_LOGO = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <defs>
     <linearGradient id="etpGrad" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0" stop-color="#10B981"/>
-      <stop offset="1" stop-color="#0D9488"/>
+      <stop offset="1" stop-color="#059669"/>
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="14" fill="url(#etpGrad)"/>
   <text x="32" y="43"
         font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
         font-size="26" font-weight="900"
-        fill="#04140E" text-anchor="middle"
+        fill="#FFFFFF" text-anchor="middle"
         letter-spacing="0.5">ETP</text>
 </svg>`.trim();
 
@@ -64,7 +64,6 @@ function lerTemaSalvo(){
   try {
     const t = localStorage.getItem(TEMA_KEY);
     if (t === 'light' || t === 'dark') return t;
-    // Sem preferência: respeita o sistema
     if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark';
   } catch(e){}
   return 'light';
@@ -113,9 +112,7 @@ function preencherNumeroETPInicial(){
   if (!exEl || !numEl) return;
 
   if (!exEl.value) exEl.value = String(new Date().getFullYear());
-  if (numEl.value && numEl.value !== '042') return; // usuário já preencheu
-
-  // Se houver rascunho salvo, respeita
+  if (numEl.value && numEl.value !== '042') return;
   if (numEl.dataset.userEdited === '1') return;
 
   const { proximo } = obterProximoNumeroETP(exEl.value);
@@ -416,6 +413,7 @@ function abrirImportarDFD(){
 
 function fecharImportarDFD(){
   const m = document.getElementById('dfdModal');
+  if (!m) return;
   m.classList.remove('show');
   m.setAttribute('aria-hidden', 'true');
 }
@@ -469,8 +467,6 @@ async function extrairDadosDFD(file){
 async function extrairDFDJson(file){
   const txt = await file.text();
   const raw = JSON.parse(txt);
-
-  // Aceita diferentes formatos: pacote LicitaReq, DFD direto, etc.
   const d = raw.dfd || raw.dados || raw.documento || raw;
 
   const campos = {
@@ -501,7 +497,6 @@ async function extrairDFDPdf(file){
   for (let i = 1; i <= pdf.numPages; i++){
     const page = await pdf.getPage(i);
     const content = await page.getTextContent();
-    // Junta com quebras inteligentes
     const linhaAtual = [];
     let lastY = null;
     content.items.forEach(item => {
@@ -540,14 +535,12 @@ function extrairCamposDoTextoDFD(texto){
   const email = pick(/([\w._%+\-]+@[\w.\-]+\.[A-Za-z]{2,})/i);
   const processo = pick(/Processo(?:\s+Administrativo)?[\s:.\-–]+([0-9.\-\/]{6,40})/i);
 
-  // Valor: aceita 12.345,67 ou 12345.67 ou R$ 12.345,67
   let valor = pick(/(?:Valor\s+(?:Total\s+)?Estimado)[\s:.\-–]*R?\$?\s*([\d.,]{3,20})/i);
   if (!valor){
     const m = t.match(/R\$\s*([\d]{1,3}(?:[.\s]\d{3})*(?:,\d{2})?)/);
     if (m) valor = m[1];
   }
   if (valor){
-    // Normaliza para número
     let v = valor.replace(/\s/g, '');
     if (v.includes(',') && v.includes('.')) v = v.replace(/\./g, '').replace(',', '.');
     else if (v.includes(',')) v = v.replace(',', '.');
@@ -571,7 +564,6 @@ function aplicarImportacaoDFD(){
   const c = dfdExtraido.campos;
   const setV = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = String(v); };
 
-  // Mapeamento DFD → ETP
   if (c.objeto)        setV('objeto', c.objeto);
   if (c.unidade)       setV('unidade', c.unidade);
   if (c.responsavel)   setV('responsavel', c.responsavel);
@@ -584,7 +576,6 @@ function aplicarImportacaoDFD(){
     if (numEl && !numEl.value) numEl.value = c.processo || `Ref. DFD ${c.numero}`;
   }
 
-  // Valor estimado → primeira linha da tabela de preços
   if (c.valor){
     const primeiro = document.querySelector('#tbPreco tr');
     if (primeiro){
@@ -600,7 +591,6 @@ function aplicarImportacaoDFD(){
     }
   }
 
-  // Registra número do DFD como referência
   if (c.numero){
     const justEl = document.getElementById('pcaJustificativa');
     if (justEl && !justEl.value){
@@ -614,7 +604,11 @@ function aplicarImportacaoDFD(){
   setTimeout(() => {
     ['objeto','unidade','responsavel','necessidade'].forEach(id => {
       const el = document.getElementById(id);
-      if (el && el.value) { el.style.transition = 'box-shadow .4s'; el.style.boxShadow = '0 0 0 3px rgba(16,185,129,.35)'; setTimeout(() => el.style.boxShadow = '', 1200); }
+      if (el && el.value) {
+        el.style.transition = 'box-shadow .4s';
+        el.style.boxShadow = '0 0 0 3px rgba(16,185,129,.35)';
+        setTimeout(() => el.style.boxShadow = '', 1200);
+      }
     });
   }, 200);
 }
@@ -945,7 +939,7 @@ function montarDocumento(d, conf, meta){
       author: d.id.orgao || 'LicitaETP',
       subject: 'ETP — Lei nº 14.133/2021, art. 18, § 1º',
       keywords: `ETP, Licitações, Lei 14.133/2021, ${meta.tag}`,
-      creator: 'LicitaETP v2.0'
+      creator: 'LicitaETP v2.1'
     },
     header: (cp, total) => {
       if (cp <= 3 || cp === total) return null;
@@ -1029,7 +1023,6 @@ async function gerarPDF(){
   const hash = await sha256Hex(JSON.stringify({ etp:d, conformidade:conf.score, tag, emitidoEm }));
   const meta = { tag, hash, emitidoEm, exercicio };
 
-  // Consome número sequencial ao gerar o PDF
   if (!d.id.numero || d.id.numero === '042' || !document.getElementById('numeroEtp').dataset.userEdited){
     const novo = consumirNumeroETP(exercicio);
     document.getElementById('numeroEtp').value = novo;
@@ -1057,7 +1050,7 @@ async function exportarJSON(){
   const emitidoEm = new Date().toISOString();
   const hash = await sha256Hex(JSON.stringify({ etp:d, tag, emitidoEm }));
   const pacote = {
-    sistema:'LicitaETP', versao:'2.0.0', trilha:'LICITAETP', tipo:'auditoria',
+    sistema:'LicitaETP', versao:'2.1.0', trilha:'LICITAETP', tipo:'auditoria',
     tag, hash, emitidoEm,
     conformidade: { score:conf.score, incisos:conf.linhas.map(l => ({ inciso:l.n, status:l.status, pct:l.pct })) },
     etp:d
@@ -1077,7 +1070,7 @@ async function exportarJSON(){
 function salvarRascunho(){
   try {
     const pacote = {
-      sistema:'LicitaETP', versao:'2.0.0', tipo:'rascunho',
+      sistema:'LicitaETP', versao:'2.1.0', tipo:'rascunho',
       salvoEm: new Date().toISOString(),
       logo: logoDataUrl,
       dados: coletarDados()
@@ -1356,5 +1349,5 @@ document.addEventListener('DOMContentLoaded', async () => {
 });
 
 /* =====================================================================
-   FIM — LicitaETP v2.0
+   FIM — LicitaETP v2.1
    ===================================================================== */
