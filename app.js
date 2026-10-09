@@ -1,8 +1,8 @@
 /* =====================================================================
-   LICITAETP v2.5.1 — NÚCLEO COMPLETO
+   LICITAETP v2.6 — NÚCLEO COMPLETO
    Estudo Técnico Preliminar · Lei nº 14.133/2021
    Parser DFD posicional + Captura de Logo + Delimitação Estrita
-   + Anti-paginação (defesa em profundidade: parser → cleanValue → render)
+   + Anti-paginação + Integração de Metadados (enquadramento/prazos/governança)
    ===================================================================== */
 'use strict';
 
@@ -15,7 +15,7 @@ const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 
 /* =====================================================================
-   1. LOGO / FAVICON SVG — FUNDO VERDE + LETRAS BRANCAS
+   1. LOGO / FAVICON SVG
    ===================================================================== */
 const SVG_LOGO = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
@@ -26,11 +26,7 @@ const SVG_LOGO = `
     </linearGradient>
   </defs>
   <rect width="64" height="64" rx="14" fill="url(#etpGrad)"/>
-  <text x="32" y="43"
-        font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif"
-        font-size="26" font-weight="900"
-        fill="#FFFFFF" text-anchor="middle"
-        letter-spacing="0.5">ETP</text>
+  <text x="32" y="43" font-family="ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif" font-size="26" font-weight="900" fill="#FFFFFF" text-anchor="middle" letter-spacing="0.5">ETP</text>
 </svg>`.trim();
 
 const svgToDataUrl = svg => 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg);
@@ -58,10 +54,9 @@ function injetarIdentidadeVisual(){
 }
 
 /* =====================================================================
-   2. TEMA DARK / LIGHT
+   2. TEMA
    ===================================================================== */
 const TEMA_KEY = 'licitaetp_theme';
-
 function lerTemaSalvo(){
   try {
     const t = localStorage.getItem(TEMA_KEY);
@@ -70,7 +65,6 @@ function lerTemaSalvo(){
   } catch(e){}
   return 'light';
 }
-
 function aplicarTema(tema){
   document.documentElement.setAttribute('data-theme', tema);
   const sun = document.getElementById('iconSun');
@@ -79,7 +73,6 @@ function aplicarTema(tema){
   if (tema === 'dark'){ sun.style.display = 'block'; moon.style.display = 'none'; }
   else { sun.style.display = 'none'; moon.style.display = 'block'; }
 }
-
 function alternarTema(){
   const atual = document.documentElement.getAttribute('data-theme') || 'light';
   const novo = atual === 'dark' ? 'light' : 'dark';
@@ -89,10 +82,9 @@ function alternarTema(){
 }
 
 /* =====================================================================
-   3. NUMERAÇÃO DINÂMICA DO ETP
+   3. NUMERAÇÃO ETP
    ===================================================================== */
 const ETP_COUNTER_KEY = 'licitaetp_counter';
-
 function obterProximoNumeroETP(exercicio){
   const ex = String(exercicio || new Date().getFullYear());
   let counters = {};
@@ -100,14 +92,12 @@ function obterProximoNumeroETP(exercicio){
   const atual = parseInt(counters[ex] || '0', 10);
   return { proximo: atual + 1, counters, ex };
 }
-
 function consumirNumeroETP(exercicio){
   const { proximo, counters, ex } = obterProximoNumeroETP(exercicio);
   counters[ex] = proximo;
   try { localStorage.setItem(ETP_COUNTER_KEY, JSON.stringify(counters)); } catch(e){}
   return String(proximo).padStart(3, '0');
 }
-
 function preencherNumeroETPInicial(){
   const exEl = document.getElementById('exercicio');
   const numEl = document.getElementById('numeroEtp');
@@ -119,39 +109,31 @@ function preencherNumeroETPInicial(){
   numEl.value = String(proximo).padStart(3, '0');
   numEl.placeholder = String(proximo).padStart(3, '0');
 }
-
 function marcarNumeroEditado(){
   const numEl = document.getElementById('numeroEtp');
   if (numEl) numEl.dataset.userEdited = '1';
 }
 
 /* =====================================================================
-   4. MODAL DE BOAS-VINDAS
+   4. WELCOME
    ===================================================================== */
 const WELCOME_KEY = 'licitaetp_welcome_dismissed';
-
 function deveExibirWelcome(){
-  try { return localStorage.getItem(WELCOME_KEY) !== '1'; }
-  catch(e){ return true; }
+  try { return localStorage.getItem(WELCOME_KEY) !== '1'; } catch(e){ return true; }
 }
-
 function abrirWelcome(){
   const m = document.getElementById('welcomeModal');
   if (!m) return;
   m.classList.add('show');
   m.setAttribute('aria-hidden', 'false');
 }
-
 function fecharWelcome(){
   const cb = document.getElementById('welcomeDontShow');
-  if (cb?.checked){
-    try { localStorage.setItem(WELCOME_KEY, '1'); } catch(e){}
-  }
+  if (cb?.checked){ try { localStorage.setItem(WELCOME_KEY, '1'); } catch(e){} }
   const m = document.getElementById('welcomeModal');
   m.classList.remove('show');
   m.setAttribute('aria-hidden', 'true');
 }
-
 function abrirAjuda(){
   const cb = document.getElementById('welcomeDontShow');
   if (cb) cb.checked = false;
@@ -169,22 +151,22 @@ let panels = [];
 let TOTAL  = 0;
 
 /* =====================================================================
-   6. NAVEGAÇÃO / WIZARD
+   6. NAVEGAÇÃO
    ===================================================================== */
 const PASSOS = [
   { t:'Identificação do ETP',        s:'Dados institucionais e objeto' },
   { t:'I · Necessidade',             s:'Problema a ser resolvido' },
-  { t:'II · Alinhamento ao PCA',     s:'Plano de Contratações Anual' },
+  { t:'II · PCA e Enquadramento',    s:'Dotação e modalidade' },
   { t:'III · Requisitos',            s:'Sustentabilidade e padrões' },
   { t:'IV · Quantidades',            s:'Memória de cálculo' },
   { t:'V · Levantamento de mercado', s:'Alternativas e riscos' },
   { t:'VI · Estimativa de preços',   s:'Método de cotação' },
-  { t:'VII · Solução como um todo',  s:'Descrição integrada' },
+  { t:'VII · Solução e prazos',      s:'Entrega e execução' },
   { t:'VIII · Parcelamento',         s:'Justificativa técnica' },
   { t:'IX · Resultados pretendidos', s:'Economicidade' },
   { t:'X · Providências prévias',    s:'Contratações correlatas' },
   { t:'XI · Posicionamento',         s:'Conclusão e viabilidade' },
-  { t:'Aprovadores',                 s:'Elaboradores e validadores' }
+  { t:'Aprovadores e Governança',    s:'Equipe e fiscalização' }
 ];
 
 function renderNav(){
@@ -234,7 +216,6 @@ function addQtd(d = {}){
     <td style="text-align:center"><button class="btn-xs" onclick="this.closest('tr').remove();recalcularTotal()">×</button></td>`;
   tb.appendChild(tr);
 }
-
 function addMercado(d = {}){
   const tb = document.getElementById('tbMercado');
   if (!tb) return;
@@ -247,7 +228,6 @@ function addMercado(d = {}){
     <td style="text-align:center"><button class="btn-xs" onclick="this.closest('tr').remove()">×</button></td>`;
   tb.appendChild(tr);
 }
-
 function addPreco(d = {}){
   const tb = document.getElementById('tbPreco');
   if (!tb) return;
@@ -262,7 +242,6 @@ function addPreco(d = {}){
   tb.appendChild(tr);
   tr.querySelectorAll('input').forEach(i => i.addEventListener('input', recalcularTotal));
 }
-
 function addAprovador(d = {}){
   const lst = document.getElementById('listaAprovadores');
   if (!lst) return;
@@ -274,33 +253,19 @@ function addAprovador(d = {}){
       <button class="btn-xs" onclick="this.closest('.aprov-card').remove()">×</button>
     </div>
     <div class="aprov-grid">
-      <div style="grid-column:span 2">
-        <label class="lbl">Nome completo</label>
-        <input class="inp" data-a="nome" value="${esc(d.nome||'')}" placeholder="Nome do agente">
-      </div>
-      <div>
-        <label class="lbl">Papel</label>
+      <div style="grid-column:span 2"><label class="lbl">Nome completo</label><input class="inp" data-a="nome" value="${esc(d.nome||'')}" placeholder="Nome do agente"></div>
+      <div><label class="lbl">Papel</label>
         <select class="sel" data-a="papel">
           ${['Elaborador','Validador','Aprovador','Autoridade Competente','Fiscal Técnico']
             .map(p => `<option ${d.papel===p?'selected':''}>${p}</option>`).join('')}
         </select>
       </div>
-      <div>
-        <label class="lbl">Cargo / Função</label>
-        <input class="inp" data-a="cargo" value="${esc(d.cargo||'')}" placeholder="Ex.: Diretor de Administração">
-      </div>
-      <div style="grid-column:span 2">
-        <label class="lbl">Órgão / Unidade</label>
-        <input class="inp" data-a="orgao" value="${esc(d.orgao||'')}" placeholder="Ex.: Coordenação-Geral de Logística">
-      </div>
-      <div style="grid-column:span 2">
-        <label class="lbl">Matrícula / Identificador funcional</label>
-        <input class="inp" data-a="matricula" value="${esc(d.matricula||'')}" placeholder="Opcional">
-      </div>
+      <div><label class="lbl">Cargo / Função</label><input class="inp" data-a="cargo" value="${esc(d.cargo||'')}" placeholder="Ex.: Diretor de Administração"></div>
+      <div style="grid-column:span 2"><label class="lbl">Órgão / Unidade</label><input class="inp" data-a="orgao" value="${esc(d.orgao||'')}" placeholder="Ex.: Coordenação-Geral de Logística"></div>
+      <div style="grid-column:span 2"><label class="lbl">Matrícula / Identificador funcional</label><input class="inp" data-a="matricula" value="${esc(d.matricula||'')}" placeholder="Opcional"></div>
     </div>`;
   lst.appendChild(div);
 }
-
 function recalcularTotal(){
   let soma = 0;
   $$('#tbPreco tr').forEach(tr => {
@@ -344,21 +309,35 @@ function coletarDados(){
     },
     nec: { necessidade: v('necessidade'), causaRaiz: v('causaRaiz'), publicoAlvo: v('publicoAlvo') },
     pca: { previsto: v('pcaPrevisto'), item: v('pcaItem'), justificativa: v('pcaJustificativa') },
+    enq: {
+      dotacao: v('dotacaoOrcamentaria'), fonte: v('fonteRecurso'),
+      modalidade: v('modalidadePretendida'), criterio: v('criterioJulgamento')
+    },
     req: {
       sustentaveis: checks('sustent'), tecnicos: v('reqTecnicos'),
       habilitacao: v('reqHabilitacao'), garantia: v('reqGarantia'), entrega: v('reqEntrega')
     },
-    qtd: { itens: readTable('tbQtd', ['item','descricao','quantidade','unidade','memoria']), metodo: v('metodoQtd') },
+    qtd: {
+      descricao: v('qtdDescricao'),
+      itens: readTable('tbQtd', ['item','descricao','quantidade','unidade','memoria']),
+      metodo: v('metodoQtd')
+    },
     mercado: { alternativas: readTable('tbMercado', ['alternativa','descricao','vantagens','riscos']), conclusao: v('conclusaoMercado') },
     precos: {
       metodo: v('metodoPreco'), itens: readTable('tbPreco', ['item','fonte','unitario','quantidade','total']),
       observacoes: v('obsPreco'), total: recalcularTotal()
     },
     solucao: { descricao: v('descricaoSolucao'), entregas: v('entregas'), ciclo: v('cicloVida') },
+    prazos: { execucao: v('prazoExecucao'), local: v('localEntrega'), pagamento: v('condicoesPagamento') },
     parcel: { decisao: v('parcelar'), itens: v('itensParcelaveis'), justificativa: v('justificativaParcelamento') },
     result: { resultados: v('resultados'), economicidade: v('economicidade'), indicadores: v('indicadores') },
     prov: { providencias: v('providencias'), correlatas: v('correlatas'), impacto: v('impactoProvidencias') },
     conc: { posicionamento: v('posicionamento'), recomendacoes: v('recomendacoes'), conclusao: v('conclusao') },
+    governanca: {
+      fiscalTitular: v('fiscalTitular'),
+      fiscalSubstituto: v('fiscalSubstituto'),
+      gestor: v('gestorContrato')
+    },
     aprov: $$('#listaAprovadores > .aprov-card').map(div => {
       const g = k => div.querySelector(`[data-a="${k}"]`)?.value.trim() || '';
       return { nome: g('nome'), papel: g('papel'), cargo: g('cargo'), orgao: g('orgao'), matricula: g('matricula') };
@@ -371,12 +350,12 @@ function coletarDados(){
    ===================================================================== */
 const INCISOS = [
   { n:'I',    t:'Descrição da necessidade',           f:d => [d.nec.necessidade, d.nec.causaRaiz, d.nec.publicoAlvo] },
-  { n:'II',   t:'Alinhamento ao PCA',                 f:d => [d.pca.previsto, d.pca.item, d.pca.justificativa] },
+  { n:'II',   t:'Alinhamento ao PCA e enquadramento', f:d => [d.pca.previsto, d.pca.item, d.pca.justificativa, d.enq.dotacao, d.enq.fonte, d.enq.modalidade, d.enq.criterio] },
   { n:'III',  t:'Requisitos da contratação',          f:d => [d.req.sustentaveis.join(' '), d.req.tecnicos, d.req.habilitacao, d.req.garantia, d.req.entrega] },
-  { n:'IV',   t:'Quantidades e memória de cálculo',   f:d => [d.qtd.metodo, d.qtd.itens.map(i => JSON.stringify(i)).join(' ')] },
+  { n:'IV',   t:'Quantidades e memória de cálculo',   f:d => [d.qtd.descricao, d.qtd.metodo, d.qtd.itens.map(i => JSON.stringify(i)).join(' ')] },
   { n:'V',    t:'Levantamento de mercado',            f:d => [d.mercado.conclusao, d.mercado.alternativas.map(i => JSON.stringify(i)).join(' ')] },
   { n:'VI',   t:'Estimativa preliminar de preços',    f:d => [d.precos.metodo, d.precos.observacoes, d.precos.itens.map(i => JSON.stringify(i)).join(' ')] },
-  { n:'VII',  t:'Descrição da solução como um todo',  f:d => [d.solucao.descricao, d.solucao.entregas, d.solucao.ciclo] },
+  { n:'VII',  t:'Descrição da solução como um todo',  f:d => [d.solucao.descricao, d.solucao.entregas, d.solucao.ciclo, d.prazos.execucao, d.prazos.local, d.prazos.pagamento] },
   { n:'VIII', t:'Justificativa para parcelamento',    f:d => [d.parcel.decisao, d.parcel.itens, d.parcel.justificativa] },
   { n:'IX',   t:'Resultados pretendidos',             f:d => [d.result.resultados, d.result.economicidade, d.result.indicadores] },
   { n:'X',    t:'Providências prévias',               f:d => [d.prov.providencias, d.prov.correlatas, d.prov.impacto] },
@@ -389,7 +368,6 @@ function avaliarInciso(valores){
   if (txt.length < 140) return { status:'Parcial',        pct:50,  cor:'#B45309', bg:'#FFFBEB' };
   return                       { status:'Atendido',       pct:100, cor:'#15803D', bg:'#F0FDF4' };
 }
-
 function calcularConformidade(d){
   const linhas = INCISOS.map(i => ({ ...i, ...avaliarInciso(i.f(d)) }));
   const score = Math.round(linhas.reduce((a, l) => a + l.pct, 0) / linhas.length);
@@ -397,10 +375,8 @@ function calcularConformidade(d){
 }
 
 /* =====================================================================
-   10. IMPORTAÇÃO DE DFD — PARSER + CAPTURA DE LOGO
+   10. PARSER DFD
    ===================================================================== */
-
-/* ---------- 10.1 · BLACKLIST DE RÓTULOS VISUAIS ---------- */
 const LABELS_BLACKLIST_RAW = [
   'ÓRGÃO / ENTIDADE','ÓRGÃO ENTIDADE','ÓRGÃO/ENTIDADE','ÓRGÃO','ENTIDADE',
   'UASG / CÓDIGO','UASG/CÓDIGO','UASG',
@@ -442,15 +418,10 @@ const LABELS_BLACKLIST_RAW = [
 ];
 
 function normalizarLabel(s){
-  return String(s || '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/[:\-–—|.,;]+/g, ' ')
-    .replace(/\//g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[:\-–—|.,;]+/g, ' ').replace(/\//g, ' ')
+    .replace(/\s+/g, ' ').trim();
 }
-
 const LABELS_BLACKLIST = new Set(LABELS_BLACKLIST_RAW.map(normalizarLabel));
 
 function ehLabelVisual(valor){
@@ -460,18 +431,15 @@ function ehLabelVisual(valor){
   return LABELS_BLACKLIST.has(v);
 }
 
-/* ---------- 10.2 · CLEAN VALUE (v2.5.1 — anti-paginação) ---------- */
+/* ---------- CLEAN VALUE (anti-paginação) ---------- */
 function cleanValue(text){
   if (text == null) return '';
   let v = String(text);
   v = v.replace(/\r/g, '\n').replace(/\n+/g, ' ').replace(/\t/g, ' ');
   v = v.replace(/\s{2,}/g, ' ');
-
-  /* ---------- v2.5.1 · ANTI-PAGINAÇÃO (source) ---------- */
   v = v.replace(/\b(?:P[áa]gina|Page)\s+\d+\s*(?:de|of|\/)\s*\d+\b/gi, ' ');
   v = v.replace(/[\[\]·•\-–—]*\s*(?:P[áa]gina|Page)\s+\d+\s*(?:de|of|\/)\s*\d+\s*[\[\]·•\-–—]*/gi, ' ');
   v = v.replace(/^\s*\d+\s*(?:de|\/)\s*\d+\s*$/gm, ' ');
-
   v = v.replace(/^[\s:;\-–—_\/|>»•·●◦‣▪►]+/, '');
   v = v.replace(/[\s:;\-–—_\/|]+$/, '');
 
@@ -514,7 +482,6 @@ function cleanValue(text){
   return v;
 }
 
-/* ---------- 10.3 · SANITIZAÇÃO DO TEXTO ---------- */
 function sanitizarTextoPDF(txt){
   if (!txt) return '';
   let t = String(txt).replace(/\r/g, '\n');
@@ -526,8 +493,6 @@ function sanitizarTextoPDF(txt){
   t = t.replace(/^[-–—_=]{3,}\s*$/gm, '');
   t = t.replace(/Documento\s+gerado\s+eletronicamente[^\n]*/gi, '');
   t = t.replace(/Emitido\s+em[^\n]*/gi, '');
-
-  /* v2.5.1 · paginação inline (meio de frase) */
   t = t.replace(/\b(?:P[áa]gina|Page)\s+\d+\s*(?:de|of|\/)\s*\d+\b/gi, ' ');
   t = t.replace(/[\[\]·•\-–—]*\s*(?:P[áa]gina|Page)\s+\d+\s*(?:de|of|\/)\s*\d+\s*[\[\]·•\-–—]*/gi, ' ');
 
@@ -546,22 +511,17 @@ function sanitizarTextoPDF(txt){
   return t;
 }
 
-/* ---------- 10.4 · EXTRAÇÃO POR ÂNCORA COM BLACKLIST ---------- */
 function extrairPorRotulo(texto, rotulos, opts = {}){
   const { maxLen = 300, maxLinhasAdiante = 6 } = opts;
   const linhas = String(texto).split('\n');
-
   for (const rotulo of rotulos){
     const rotEsc = escapeRegex(rotulo);
     const rxRot = new RegExp(`^\\s*${rotEsc}\\s*[:\\-–—|]?\\s*(.*)$`, 'i');
-
     for (let i = 0; i < linhas.length; i++){
       const m = linhas[i].match(rxRot);
       if (!m) continue;
-
       const inline = cleanValue(m[1]);
       if (inline) return inline.slice(0, maxLen);
-
       for (let j = i + 1; j <= Math.min(i + maxLinhasAdiante, linhas.length - 1); j++){
         const candRaw = linhas[j];
         if (!candRaw || !candRaw.trim()) continue;
@@ -575,42 +535,27 @@ function extrairPorRotulo(texto, rotulos, opts = {}){
   return '';
 }
 
-/* ---------- 10.5 · EXTRAÇÃO DE BLOCO (com truncamento universal) ---------- */
 function extrairBloco(texto, rotulo, rotulosFim, opts = {}){
   const { maxLen = 2000 } = opts;
   const esc_rot = escapeRegex(rotulo);
-  const rx = new RegExp(
-    `(?:^|\\n)\\s*${esc_rot}\\s*[:\\-–—|]?\\s*([\\s\\S]{0,${maxLen}})`,
-    'i'
-  );
+  const rx = new RegExp(`(?:^|\\n)\\s*${esc_rot}\\s*[:\\-–—|]?\\s*([\\s\\S]{0,${maxLen}})`, 'i');
   const m = texto.match(rx);
   if (!m || !m[1]) return '';
-
   const linhas   = m[1].split('\n');
   const alvosFim = (rotulosFim || []).map(normBusca);
   const aceitas  = [];
-
   for (const linha of linhas){
     const norm = normBusca(linha);
     if (!norm) continue;
-
-    if (alvosFim.some(a =>
-          norm === a ||
-          norm.startsWith(a + ' ') ||
-          norm.startsWith(a + ':'))) break;
-
+    if (alvosFim.some(a => norm === a || norm.startsWith(a + ' ') || norm.startsWith(a + ':'))) break;
     if (ehStopLabelUniversal(norm)) break;
-
     if (norm.startsWith('[[pagina_')) break;
-
     aceitas.push(linha);
     if (aceitas.join(' ').length > maxLen) break;
   }
-
   return cleanValue(aceitas.join(' ')).slice(0, maxLen);
 }
 
-/* ---------- 10.6 · NORMALIZAÇÃO MONETÁRIA ---------- */
 function normalizarMoeda(v){
   if (!v) return '';
   let s = String(v).replace(/[^\d.,]/g, '');
@@ -621,74 +566,46 @@ function normalizarMoeda(v){
   return isNaN(n) ? '' : n.toFixed(2);
 }
 
-/* =====================================================================
-   10.7 · EXTRAÇÃO DE IMAGENS (LOGO) DO PDF
-   ===================================================================== */
+/* ---------- LOGO ---------- */
 async function extrairLogoDoPdf(file){
   if (!window.pdfjsLib) return null;
-
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   let pdf;
   try {
     const buf = await file.arrayBuffer();
     pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-  } catch(e){
-    console.warn('[Logo] PDF inválido:', e);
-    return null;
-  }
+  } catch(e){ console.warn('[Logo] PDF inválido:', e); return null; }
 
   const paginasAlvo = Math.min(3, pdf.numPages);
   const candidatos  = [];
 
   for (let p = 1; p <= paginasAlvo; p++){
-    let page;
-    try { page = await pdf.getPage(p); } catch(e){ continue; }
-
-    let opList;
-    try { opList = await page.getOperatorList(); } catch(e){ continue; }
-
+    let page; try { page = await pdf.getPage(p); } catch(e){ continue; }
+    let opList; try { opList = await page.getOperatorList(); } catch(e){ continue; }
     const nomesXObj = new Set();
     const inlineImgs = [];
-
     for (let i = 0; i < opList.fnArray.length; i++){
-      const fn   = opList.fnArray[i];
-      const args = opList.argsArray[i];
+      const fn = opList.fnArray[i]; const args = opList.argsArray[i];
       if (!args) continue;
-
       if (fn === pdfjsLib.OPS.paintImageXObject && args[0])   nomesXObj.add(args[0]);
       if (fn === pdfjsLib.OPS.paintJpegXObject  && args[0])   nomesXObj.add(args[0]);
       if (fn === pdfjsLib.OPS.paintInlineImageXObject && args[0]) inlineImgs.push(args[0]);
     }
-
     for (const nome of nomesXObj){
       const obj = await new Promise(resolve => {
-        let done = false;
-        const finish = v => { if (!done){ done = true; resolve(v); } };
+        let done = false; const finish = v => { if (!done){ done = true; resolve(v); } };
         const timer = setTimeout(() => finish(null), 800);
         const cb = img => { clearTimeout(timer); finish(img); };
-        try {
-          page.objs.get(nome, cb);
-        } catch(e){
-          try { page.commonObjs.get(nome, cb); }
-          catch(e2){ clearTimeout(timer); finish(null); }
-        }
+        try { page.objs.get(nome, cb); }
+        catch(e){ try { page.commonObjs.get(nome, cb); } catch(e2){ clearTimeout(timer); finish(null); } }
       });
-      if (obj && obj.width && obj.height && obj.data){
-        candidatos.push({ obj, pagina: p, fonte: 'named' });
-      }
+      if (obj && obj.width && obj.height && obj.data) candidatos.push({ obj, pagina: p, fonte: 'named' });
     }
-
     for (const obj of inlineImgs){
-      if (obj && obj.width && obj.height && obj.data){
-        candidatos.push({ obj, pagina: p, fonte: 'inline' });
-      }
+      if (obj && obj.width && obj.height && obj.data) candidatos.push({ obj, pagina: p, fonte: 'inline' });
     }
   }
-
   if (!candidatos.length) return null;
-
   const validos = [];
   for (const c of candidatos){
     const { width, height, data } = c.obj;
@@ -699,152 +616,90 @@ async function extrairLogoDoPdf(file){
     if (ratio < 0.15 || ratio > 6) continue;
     const area = width * height;
     if (area < 2000) continue;
-
     const dataUrl = bitmapParaDataUrl(c.obj);
     if (!dataUrl) continue;
     if (dataUrl.length > 800 * 1024) continue;
-
     validos.push({ dataUrl, width, height, area, pagina: c.pagina, fonte: c.fonte });
   }
-
   if (!validos.length) return null;
-
   validos.sort((a, b) => b.area - a.area);
   const melhor = validos[0];
-  console.info('[Logo] capturada:', `${melhor.width}×${melhor.height}`,
-               'pág', melhor.pagina, `(${melhor.fonte})`);
+  console.info('[Logo] capturada:', `${melhor.width}×${melhor.height}`, 'pág', melhor.pagina, `(${melhor.fonte})`);
   return melhor.dataUrl;
 }
-
-/** Converte {width,height,data,kind} do pdf.js em DataURL PNG. */
 function bitmapParaDataUrl(imgObj){
   try {
     const { width, height, data } = imgObj;
     if (!width || !height || !data) return null;
-
     const canvas = document.createElement('canvas');
-    canvas.width  = width;
-    canvas.height = height;
+    canvas.width = width; canvas.height = height;
     const ctx  = canvas.getContext('2d');
     const imgD = ctx.createImageData(width, height);
     const n    = width * height;
-
     if (data.length === n * 4){
       imgD.data.set(data instanceof Uint8ClampedArray ? data : new Uint8ClampedArray(data));
     } else if (data.length === n * 3){
       for (let i = 0, j = 0; i < data.length; i += 3, j += 4){
-        imgD.data[j]   = data[i];
-        imgD.data[j+1] = data[i+1];
-        imgD.data[j+2] = data[i+2];
-        imgD.data[j+3] = 255;
+        imgD.data[j] = data[i]; imgD.data[j+1] = data[i+1]; imgD.data[j+2] = data[i+2]; imgD.data[j+3] = 255;
       }
     } else if (data.length === n){
       for (let i = 0, j = 0; i < data.length; i++, j += 4){
         const v = data[i];
-        imgD.data[j] = imgD.data[j+1] = imgD.data[j+2] = v;
-        imgD.data[j+3] = 255;
+        imgD.data[j] = imgD.data[j+1] = imgD.data[j+2] = v; imgD.data[j+3] = 255;
       }
-    } else {
-      return null;
-    }
-
+    } else return null;
     ctx.putImageData(imgD, 0, 0);
     return canvas.toDataURL('image/png');
-  } catch(e){
-    console.warn('[Logo] bitmapParaDataUrl falhou:', e);
-    return null;
-  }
+  } catch(e){ console.warn('[Logo] bitmapParaDataUrl falhou:', e); return null; }
 }
 
-/* =====================================================================
-   10.8 · CONSTRUÇÃO DA GRADE DE CÉLULAS (TABELA-AWARE)
-   ===================================================================== */
-
-/* ---------- 10.8.1 · LABELS UNIVERSAIS DE PARADA ---------- */
+/* ---------- STOP LABELS UNIVERSAIS (com v2.6) ---------- */
 const STOP_LABELS_UNIVERSAL_RAW = [
-  'Justificativa da Necessidade',
-  'Justificativa da Necessidade Pública',
-  'Justificativa da Necessidade Pública (Fundamentada)',
-  'Justificativa da Demanda',
-  'Justificativa da Contratação',
-  'Justificativa',
-  'Estimativa de Quantidades',
-  'Estimativa de Quantidade',
+  /* Seções típicas */
+  'Justificativa da Necessidade','Justificativa da Necessidade Pública',
+  'Justificativa da Necessidade Pública (Fundamentada)','Justificativa da Demanda',
+  'Justificativa da Contratação','Justificativa',
+  'Estimativa de Quantidades','Estimativa de Quantidade',
   'Estimativa de Quantidades e Memória de Cálculo',
-  'Alinhamento ao Plano',
-  'Alinhamento ao Plano de Contratações Anual',
-  'Alinhamento ao PCA',
-  'Enquadramento Legal',
-  'Fundamentação Legal',
-  'Fundamentacao Legal',
-  'Requisitos da Contratação',
-  'Requisitos da Contratacao',
-  'Levantamento de Mercado',
-  'Levantamento de Mercado e Alternativas',
-  'Estimativa Preliminar de Preços',
-  'Estimativa de Preços',
-  'Estimativa de Precos',
-  'Descrição da Solução',
-  'Descricao da Solucao',
-  'Descrição da Solução como um Todo',
-  'Justificativa para Parcelamento',
-  'Justificativa para Parcelamento (ou não)',
+  'Alinhamento ao Plano','Alinhamento ao Plano de Contratações Anual','Alinhamento ao PCA',
+  'Enquadramento Legal','Fundamentação Legal','Fundamentacao Legal',
+  'Requisitos da Contratação','Requisitos da Contratacao',
+  'Levantamento de Mercado','Levantamento de Mercado e Alternativas',
+  'Estimativa Preliminar de Preços','Estimativa de Preços','Estimativa de Precos',
+  'Descrição da Solução','Descricao da Solucao','Descrição da Solução como um Todo',
+  'Justificativa para Parcelamento','Justificativa para Parcelamento (ou não)',
   'Resultados Pretendidos',
-  'Providências Prévias',
-  'Providencias Previas',
-  'Providências Prévias e Contratações Correlatas',
-  'Posicionamento Conclusivo',
-  'Posicionamento Conclusivo sobre a Viabilidade',
-  'Órgão / Entidade',
-  'Órgão/Entidade',
-  'Órgão Entidade',
-  'UASG',
-  'UASG / Código',
-  'Unidade Requisitante',
-  'Unidade Demandante',
-  'Unidade Solicitante',
-  'Setor Requisitante',
-  'Setor Demandante',
-  'Setor Solicitante',
-  'Unidade / Setor',
-  'Unidade / Setor Demandante',
-  'Responsável pela Demanda',
-  'Responsável da Demanda',
-  'Responsável Técnico',
-  'Responsável pela Elaboração',
-  'Responsável pela Solicitação',
-  'Responsável',
-  'Cargo / Função',
-  'Cargo/Função',
-  'Cargo e Função',
-  'Cargo ou Função',
-  'Cargo',
-  'Função',
-  'Valor Estimado',
-  'Valor Estimado da Contratação',
-  'Valor Total',
-  'Valor Total Estimado',
-  'Valor Global',
-  'Valor',
-  'Processo Administrativo',
-  'Nº do Processo',
-  'Número do Processo',
-  'Processo',
-  'Nº do DFD',
-  'Número do DFD',
-  'DFD',
-  'Data de Elaboração',
-  'Data'
+  'Providências Prévias','Providencias Previas','Providências Prévias e Contratações Correlatas',
+  'Posicionamento Conclusivo','Posicionamento Conclusivo sobre a Viabilidade',
+  /* Campos de identificação */
+  'Órgão / Entidade','Órgão/Entidade','Órgão Entidade',
+  'UASG','UASG / Código',
+  'Unidade Requisitante','Unidade Demandante','Unidade Solicitante',
+  'Setor Requisitante','Setor Demandante','Setor Solicitante',
+  'Unidade / Setor','Unidade / Setor Demandante',
+  'Responsável pela Demanda','Responsável da Demanda','Responsável Técnico',
+  'Responsável pela Elaboração','Responsável pela Solicitação','Responsável',
+  'Cargo / Função','Cargo/Função','Cargo e Função','Cargo ou Função','Cargo','Função',
+  'Valor Estimado','Valor Estimado da Contratação','Valor Total','Valor Total Estimado',
+  'Valor Global','Valor',
+  'Processo Administrativo','Nº do Processo','Número do Processo','Processo',
+  'Nº do DFD','Número do DFD','DFD',
+  'Data de Elaboração','Data',
+  /* v2.6 · Enquadramento / prazos / governança */
+  'Dotação Orçamentária','Dotacao Orcamentaria','Dotação','Rubrica Orçamentária','Rubrica',
+  'Fonte de Recurso','Fonte do Recurso','Fonte','Elemento de Despesa','Natureza da Despesa',
+  'Modalidade Pretendida','Modalidade de Licitação','Modalidade da Contratação','Modalidade',
+  'Critério de Julgamento','Criterio de Julgamento','Tipo de Julgamento','Critério',
+  'Prazo de Execução','Prazo de Entrega','Prazo de Vigência','Prazo Contratual','Prazo',
+  'Local de Entrega','Local da Entrega','Local de Prestação','Local',
+  'Condições de Pagamento','Condicoes de Pagamento','Forma de Pagamento','Condições de Recebimento',
+  'Fiscal Titular do Contrato','Fiscal Titular','Fiscal Substituto do Contrato','Fiscal Substituto',
+  'Fiscal do Contrato','Fiscal','Gestor do Contrato','Gestor Contratual','Gestor'
 ];
 
 const STOP_LABELS_UNIVERSAL = STOP_LABELS_UNIVERSAL_RAW.map(normBusca);
 
-/** Escapa string para uso seguro em RegExp. */
-function escapeRegex(s){
-  return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/** Retorna true se o texto normalizado é (ou começa com) um stop-label universal. */
+function escapeRegex(s){ return String(s).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); }
 function ehStopLabelUniversal(norm){
   if (!norm) return false;
   for (const alvo of STOP_LABELS_UNIVERSAL){
@@ -857,27 +712,21 @@ function ehStopLabelUniversal(norm){
 
 function construirCelulas(paginas){
   const celulas = [];
-
   for (const pag of paginas){
     const rows = [];
     const itens = [...pag.items].sort((a, b) => b.y - a.y || a.x - b.x);
-
     for (const item of itens){
       if (!item.str || !item.str.trim()) continue;
       let row = rows.find(r => Math.abs(r.y - item.y) < 3.5);
       if (!row){ row = { y: item.y, items: [] }; rows.push(row); }
       row.items.push(item);
     }
-
     for (const row of rows){
       row.items.sort((a, b) => a.x - b.x);
-      let cur = null;
-      const rowCells = [];
-
+      let cur = null; const rowCells = [];
       for (const it of row.items){
         const fimAtual = cur ? (cur.x + cur.w) : 0;
         const gap = cur ? (it.x - fimAtual) : Infinity;
-
         if (cur && gap >= 0 && gap < 15){
           cur.text += ' ' + it.str;
           cur.w = (it.x + (it.w || 0)) - cur.x;
@@ -887,7 +736,6 @@ function construirCelulas(paginas){
         }
       }
       if (cur) rowCells.push(cur);
-
       for (const c of rowCells){
         c.text = c.text.replace(/\s+/g, ' ').trim();
         if (c.text) celulas.push(c);
@@ -897,31 +745,21 @@ function construirCelulas(paginas){
   return celulas;
 }
 
-/** Normaliza texto para busca (sem acentos, lowercase, sem pontuação final). */
 function normBusca(s){
-  return String(s || '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .replace(/[:\-–—|.,;]+$/, '')
-    .trim();
+  return String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/\s+/g, ' ').replace(/[:\-–—|.,;]+$/, '').trim();
 }
 
-/** Localiza a célula que contém exatamente um dos rótulos. */
 function buscarLabelCelula(celulas, rotulos){
   const alvos = rotulos.map(normBusca);
   const achados = [];
-
   for (const cel of celulas){
     const norm = normBusca(cel.text);
     if (!norm || norm.length > 90) continue;
     for (const alvo of alvos){
       const exato  = norm === alvo;
       const prefix = norm.startsWith(alvo + ' ') || norm.startsWith(alvo + ':');
-      if (exato || prefix){
-        achados.push({ cel, alvoLen: alvo.length, exato });
-        break;
-      }
+      if (exato || prefix){ achados.push({ cel, alvoLen: alvo.length, exato }); break; }
     }
   }
   if (!achados.length) return null;
@@ -929,94 +767,58 @@ function buscarLabelCelula(celulas, rotulos){
   return achados[0].cel;
 }
 
-/**
- * Extrai valor de um label SEM CONCATENAR COLUNAS:
- *   1) célula à direita na MESMA linha
- *   2) célula ABAIXO na MESMA faixa de X (até 90pt)
- */
 function extrairValorDeLabel(celulas, labelCel){
   if (!labelCel) return '';
-
   const direita = celulas
-    .filter(c => c.page === labelCel.page
-              && Math.abs(c.y - labelCel.y) < 3.5
-              && c.x > labelCel.x + labelCel.w - 2
-              && !ehLabelVisual(c.text))
+    .filter(c => c.page === labelCel.page && Math.abs(c.y - labelCel.y) < 3.5
+              && c.x > labelCel.x + labelCel.w - 2 && !ehLabelVisual(c.text))
     .sort((a, b) => a.x - b.x);
-
   if (direita.length){
     const val = cleanValue(direita[0].text);
     if (val) return val;
   }
-
   const x0 = labelCel.x - 15;
   const x1 = labelCel.x + Math.max(280, labelCel.w + 260);
   const abaixo = celulas
-    .filter(c => c.page === labelCel.page
-              && c.y < labelCel.y - 3
-              && c.y > labelCel.y - 90
-              && c.x >= x0 && c.x <= x1)
+    .filter(c => c.page === labelCel.page && c.y < labelCel.y - 3
+              && c.y > labelCel.y - 90 && c.x >= x0 && c.x <= x1)
     .sort((a, b) => (b.y - a.y) || (a.x - b.x));
-
   for (const c of abaixo){
     if (ehLabelVisual(c.text)) continue;
-    if (buscarLabelCelula([c], [
-      'órgão','entidade','unidade','uasg','setor','responsável',
-      'cargo','função','valor','processo','exercício','data'
-    ])) break;
+    if (buscarLabelCelula([c], ['órgão','entidade','unidade','uasg','setor','responsável','cargo','função','valor','processo','exercício','data'])) break;
     const val = cleanValue(c.text);
     if (val) return val;
   }
   return '';
 }
 
-/** Extrai bloco de texto longo SEM vazar para outras seções (stop universal incluso). */
 function extrairBlocoColuna(celulas, labelCel, rotulosFim){
   if (!labelCel) return '';
-
   const x0 = labelCel.x - 15;
   const x1 = labelCel.x + 640;
   const alvosFim = (rotulosFim || []).map(normBusca);
-
   const abaixo = celulas
-    .filter(c => c.page === labelCel.page
-              && c.y < labelCel.y - 2
-              && c.x >= x0 && c.x <= x1)
+    .filter(c => c.page === labelCel.page && c.y < labelCel.y - 2 && c.x >= x0 && c.x <= x1)
     .sort((a, b) => (b.y - a.y) || (a.x - b.x));
-
   const partes = [];
   for (const c of abaixo){
     const norm = normBusca(c.text);
     if (!norm) continue;
-
-    if (alvosFim.some(a =>
-          norm === a ||
-          norm.startsWith(a + ' ') ||
-          norm.startsWith(a + ':'))) break;
-
+    if (alvosFim.some(a => norm === a || norm.startsWith(a + ' ') || norm.startsWith(a + ':'))) break;
     if (ehStopLabelUniversal(norm)) break;
-
-    if (buscarLabelCelula([c], [
-      'órgão','entidade','unidade requisitante','unidade demandante',
-      'setor requisitante','setor demandante','uasg',
-      'responsável','cargo','função','valor','processo','data'
-    ])) break;
-
+    if (buscarLabelCelula([c], ['órgão','entidade','unidade requisitante','unidade demandante','setor requisitante','setor demandante','uasg','responsável','cargo','função','valor','processo','data'])) break;
     partes.push(c.text);
     if (partes.join(' ').length > 2000) break;
   }
   return cleanValue(partes.join(' ')).slice(0, 2000);
 }
 
-/** Wrapper: rótulos → valor (posicional). */
 function extrairCampo(celulas, rotulos){
   const lc = buscarLabelCelula(celulas, rotulos);
   return extrairValorDeLabel(celulas, lc);
 }
 
-/* =====================================================================
-   10.9 · FLUXO PRINCIPAL (DFD)
-   ===================================================================== */
+/* ---------- FLUXO PRINCIPAL ---------- */
 let dfdExtraido = null;
 
 function abrirImportarDFD(){
@@ -1029,7 +831,6 @@ function abrirImportarDFD(){
   if (btn) btn.disabled = true;
   dfdExtraido = null;
 }
-
 function fecharImportarDFD(){
   const m = document.getElementById('dfdModal');
   if (!m) return;
@@ -1042,59 +843,45 @@ async function processarDFD(file){
   const list  = document.getElementById('dfdResultList');
   const box   = document.getElementById('dfdResult');
   const btn   = document.getElementById('dfdApplyBtn');
-
   try {
     toast('Lendo DFD...');
     const resultado = await extrairDadosDFD(file);
-
     let logoCapturada = null;
     if ((file.name || '').toLowerCase().endsWith('.pdf')){
       toast('Capturando logotipo institucional...');
-      try { logoCapturada = await extrairLogoDoPdf(file); }
-      catch(e){ console.warn('[Logo]', e); }
+      try { logoCapturada = await extrairLogoDoPdf(file); } catch(e){ console.warn('[Logo]', e); }
     }
-
     dfdExtraido = { ...resultado, logo: logoCapturada };
-
     const campos = Object.entries(resultado.campos).filter(([_, v]) => v && String(v).trim());
-    if (!campos.length && !logoCapturada){
-      toast('Nenhum campo ou logo reconhecido no arquivo.');
-      return;
-    }
-
+    if (!campos.length && !logoCapturada){ toast('Nenhum campo ou logo reconhecido no arquivo.'); return; }
     msgEl.textContent = `${campos.length} campo(s) via ${resultado.origem.toUpperCase()}${logoCapturada ? ' + logotipo capturado' : ''}`;
     list.innerHTML = campos.map(([k, v]) => {
       const label = {
         numero:'Nº do DFD', objeto:'Objeto', unidade:'Unidade Requisitante',
         responsavel:'Responsável pela Demanda', cargo:'Cargo / Função',
         email:'E-mail', telefone:'Telefone', valor:'Valor Estimado',
-        justificativa:'Justificativa', processo:'Processo', orgao:'Órgão', uasg:'UASG'
+        justificativa:'Justificativa', processo:'Processo', orgao:'Órgão', uasg:'UASG',
+        dotacao:'Dotação Orçamentária', fonteRecurso:'Fonte de Recurso',
+        modalidade:'Modalidade', criterio:'Critério de Julgamento',
+        prazoExecucao:'Prazo de Execução', localEntrega:'Local de Entrega',
+        condicoesPagamento:'Condições de Pagamento',
+        fiscalTitular:'Fiscal Titular', fiscalSubstituto:'Fiscal Substituto',
+        gestorContrato:'Gestor do Contrato', qtdDescricao:'Quantitativo'
       }[k] || k;
       const val = String(v).length > 140 ? String(v).slice(0, 137) + '…' : String(v);
       return `<li><span>${esc(label)}</span><span>${esc(val)}</span></li>`;
     }).join('');
-
     if (logoCapturada){
       const li = document.createElement('li');
       li.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px dashed rgba(22,163,74,.20);grid-column:1/-1';
-      li.innerHTML = `
-        <span style="color:var(--tx-3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Logotipo institucional</span>
-        <span style="display:flex;align-items:center;gap:8px">
-          <img src="${logoCapturada}" alt="Logo capturada"
-               style="width:52px;height:52px;object-fit:contain;background:var(--bg-1);
-                      border:1px solid var(--bd-1);border-radius:8px;padding:3px" />
-          <span style="color:var(--ok);font-weight:700;font-size:11.5px">✓ capturado</span>
-        </span>`;
+      li.innerHTML = `<span style="color:var(--tx-3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Logotipo institucional</span><span style="display:flex;align-items:center;gap:8px"><img src="${logoCapturada}" alt="Logo capturada" style="width:52px;height:52px;object-fit:contain;background:var(--bg-1);border:1px solid var(--bd-1);border-radius:8px;padding:3px" /><span style="color:var(--ok);font-weight:700;font-size:11.5px">✓ capturado</span></span>`;
       list.appendChild(li);
     } else {
       const li = document.createElement('li');
       li.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px dashed rgba(148,163,184,.25);grid-column:1/-1';
-      li.innerHTML = `
-        <span style="color:var(--tx-3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Logotipo institucional</span>
-        <span style="color:var(--tx-3);font-size:11.5px">— mantida a logo padrão do ETP</span>`;
+      li.innerHTML = `<span style="color:var(--tx-3);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.06em">Logotipo institucional</span><span style="color:var(--tx-3);font-size:11.5px">— mantida a logo padrão do ETP</span>`;
       list.appendChild(li);
     }
-
     box.classList.remove('hidden');
     btn.disabled = false;
   } catch(e){
@@ -1111,7 +898,6 @@ async function extrairDadosDFD(file){
   throw new Error('Formato não suportado. Envie PDF ou JSON.');
 }
 
-/* ---------- Parser JSON ---------- */
 async function extrairDFDJson(file){
   const txt = await file.text();
   let raw;
@@ -1138,42 +924,40 @@ async function extrairDFDJson(file){
     justificativa: cleanValue(pick('justificativa','descricaoNecessidade','descricao_necessidade','necessidade','motivacao')),
     processo:      cleanValue(pick('processo','processoAdministrativo','processo_administrativo','numeroProcesso','numero_processo')),
     orgao:         cleanValue(pick('orgao','orgaoEntidade','entidade','instituicao')),
-    uasg:          cleanValue(pick('uasg','codigoUasg','codigo_uasg'))
+    uasg:          cleanValue(pick('uasg','codigoUasg','codigo_uasg')),
+    dotacao:       cleanValue(pick('dotacao','dotacaoOrcamentaria','dotacao_orcamentaria','rubrica')),
+    fonteRecurso:  cleanValue(pick('fonteRecurso','fonte_recurso','fonte','naturezaDespesa')),
+    modalidade:    cleanValue(pick('modalidade','modalidadePretendida','modalidadeLicitacao','modalidade_licitacao')),
+    criterio:      cleanValue(pick('criterio','criterioJulgamento','criterio_julgamento','tipoJulgamento')),
+    prazoExecucao: cleanValue(pick('prazoExecucao','prazo_execucao','prazoEntrega','prazo')),
+    localEntrega:  cleanValue(pick('localEntrega','local_entrega','local')),
+    condicoesPagamento: cleanValue(pick('condicoesPagamento','formaPagamento','condicoes_pagamento')),
+    fiscalTitular: cleanValue(pick('fiscalTitular','fiscal_titular','fiscal')),
+    fiscalSubstituto: cleanValue(pick('fiscalSubstituto','fiscal_substituto')),
+    gestorContrato: cleanValue(pick('gestorContrato','gestor_contrato','gestor')),
+    qtdDescricao:  cleanValue(pick('quantidadeDescricao','qtdDescricao','descricaoQuantidade','quantitativo'))
   };
   const logoJson = d.logo || d.logoInstitucional || d.logoBase64 || raw?.logo || null;
   return { origem: 'json', campos, raw, logoJson };
 }
 
-/* ---------- Parser PDF (retorna texto + grade posicional) ---------- */
 async function extrairDFDPdf(file){
   if (!window.pdfjsLib) throw new Error('Biblioteca pdf.js não disponível.');
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
   const buf = await file.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
-
   const paginas = [];
   let textoCompleto = '';
-
   for (let i = 1; i <= pdf.numPages; i++){
     const page    = await pdf.getPage(i);
     const content = await page.getTextContent();
-
     const items = [];
     content.items.forEach(item => {
       const str = String(item.str || '');
       if (!str) return;
-      items.push({
-        str,
-        x: item.transform[4],
-        y: item.transform[5],
-        w: item.width  || 0,
-        h: item.height || 0
-      });
+      items.push({ str, x: item.transform[4], y: item.transform[5], w: item.width || 0, h: item.height || 0 });
     });
     paginas.push({ pageNum: i, items });
-
     const porLinha = new Map();
     items.forEach(it => {
       const yy = Math.round(it.y / 2) * 2;
@@ -1182,75 +966,59 @@ async function extrairDFDPdf(file){
     });
     const ys = Array.from(porLinha.keys()).sort((a, b) => b - a);
     ys.forEach(yy => {
-      const linha = porLinha.get(yy)
-        .sort((a, b) => a.x - b.x)
-        .map(it => it.str)
-        .join(' ')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
+      const linha = porLinha.get(yy).sort((a, b) => a.x - b.x).map(it => it.str).join(' ').replace(/\s{2,}/g, ' ').trim();
       if (linha) textoCompleto += linha + '\n';
     });
     textoCompleto += `\n[[PAGINA_${i}_DE_${pdf.numPages}]]\n\n`;
   }
-
   const textoLimpo = sanitizarTextoPDF(textoCompleto);
   const campos     = extrairCamposDFD(textoLimpo, paginas);
   return { origem: 'pdf', campos, raw: textoLimpo };
 }
 
-/* =====================================================================
-   10.10 · EXTRAÇÃO DE CAMPOS (POSICIONAL + FALLBACK)
-   ===================================================================== */
 function extrairCamposDFD(texto, paginas){
   const t = texto;
   const celulas = construirCelulas(paginas || []);
   const campos = {
     numero:'', objeto:'', unidade:'', responsavel:'',
     cargo:'', email:'', telefone:'', valor:'',
-    justificativa:'', processo:'', orgao:'', uasg:''
+    justificativa:'', processo:'', orgao:'', uasg:'',
+    dotacao:'', fonteRecurso:'', modalidade:'', criterio:'',
+    prazoExecucao:'', localEntrega:'', condicoesPagamento:'',
+    fiscalTitular:'', fiscalSubstituto:'', gestorContrato:'',
+    qtdDescricao:''
   };
 
-  campos.orgao = extrairCampo(celulas, [
-    'Órgão / Entidade','Órgão/Entidade','Órgão Entidade','Órgão','Entidade'
-  ]) || '';
-
-  campos.uasg = extrairCampo(celulas, [
-    'UASG / Código','UASG/Código','UASG','Código UASG'
-  ]) || '';
-  if (campos.uasg){
-    const m = campos.uasg.match(/\d{4,}/);
-    campos.uasg = m ? m[0] : '';
-  }
-
-  campos.unidade = extrairCampo(celulas, [
-    'Unidade Requisitante','Unidade Demandante','Setor Requisitante',
-    'Setor Demandante','Unidade Solicitante','Setor Solicitante',
-    'Unidade / Setor Demandante','Unidade / Setor',
-    'Unidade','Setor'
-  ]) || '';
-
-  campos.responsavel = extrairCampo(celulas, [
-    'Responsável pela Demanda','Responsável da Demanda',
-    'Responsável Técnico','Responsável pela Elaboração',
-    'Responsável pela Solicitação','Responsável','Solicitante','Elaborador'
-  ]) || '';
-
-  campos.cargo = extrairCampo(celulas, [
-    'Cargo / Função','Cargo/Função','Cargo e Função','Cargo ou Função',
-    'Cargo','Função'
-  ]) || '';
-
-  campos.processo = extrairCampo(celulas, [
-    'Processo Administrativo','Nº do Processo','Número do Processo',
-    'Numero do Processo','Processo'
-  ]) || '';
+  campos.orgao = extrairCampo(celulas, ['Órgão / Entidade','Órgão/Entidade','Órgão Entidade','Órgão','Entidade']) || '';
+  campos.uasg  = extrairCampo(celulas, ['UASG / Código','UASG/Código','UASG','Código UASG']) || '';
+  if (campos.uasg){ const m = campos.uasg.match(/\d{4,}/); campos.uasg = m ? m[0] : ''; }
+  campos.unidade = extrairCampo(celulas, ['Unidade Requisitante','Unidade Demandante','Setor Requisitante','Setor Demandante','Unidade Solicitante','Setor Solicitante','Unidade / Setor Demandante','Unidade / Setor','Unidade','Setor']) || '';
+  campos.responsavel = extrairCampo(celulas, ['Responsável pela Demanda','Responsável da Demanda','Responsável Técnico','Responsável pela Elaboração','Responsável pela Solicitação','Responsável','Solicitante','Elaborador']) || '';
+  campos.cargo = extrairCampo(celulas, ['Cargo / Função','Cargo/Função','Cargo e Função','Cargo ou Função','Cargo','Função']) || '';
+  campos.processo = extrairCampo(celulas, ['Processo Administrativo','Nº do Processo','Número do Processo','Numero do Processo','Processo']) || '';
   if (campos.processo && !/\d/.test(campos.processo)) campos.processo = '';
 
-  let valorTxt = extrairCampo(celulas, [
-    'Valor Estimado da Contratação','Valor Estimado da Contratacao',
-    'Valor Total Estimado','Valor Estimado','Valor Global',
-    'Valor Total','Valor Previsto','Valor'
-  ]);
+  /* v2.6 · Enquadramento */
+  campos.dotacao      = extrairCampo(celulas, ['Dotação Orçamentária','Dotacao Orcamentaria','Dotação','Rubrica Orçamentária','Rubrica','Elemento de Despesa']) || '';
+  campos.fonteRecurso = extrairCampo(celulas, ['Fonte de Recurso','Fonte do Recurso','Fonte','Natureza da Despesa']) || '';
+  campos.modalidade   = extrairCampo(celulas, ['Modalidade Pretendida','Modalidade de Licitação','Modalidade da Contratação','Modalidade']) || '';
+  campos.criterio     = extrairCampo(celulas, ['Critério de Julgamento','Criterio de Julgamento','Tipo de Julgamento','Critério']) || '';
+
+  /* v2.6 · Prazos */
+  campos.prazoExecucao = extrairCampo(celulas, ['Prazo de Execução','Prazo de Entrega','Prazo de Vigência','Prazo Contratual','Prazo']) || '';
+  campos.localEntrega  = extrairCampo(celulas, ['Local de Entrega','Local da Entrega','Local de Prestação','Local']) || '';
+  campos.condicoesPagamento = extrairCampo(celulas, ['Condições de Pagamento','Condicoes de Pagamento','Forma de Pagamento','Condições de Recebimento']) || '';
+
+  /* v2.6 · Governança */
+  campos.fiscalTitular    = extrairCampo(celulas, ['Fiscal Titular do Contrato','Fiscal Titular','Fiscal do Contrato','Fiscal']) || '';
+  campos.fiscalSubstituto = extrairCampo(celulas, ['Fiscal Substituto do Contrato','Fiscal Substituto']) || '';
+  campos.gestorContrato   = extrairCampo(celulas, ['Gestor do Contrato','Gestor Contratual','Gestor']) || '';
+
+  /* v2.6 · Quantitativo textual */
+  campos.qtdDescricao = extrairCampo(celulas, ['Estimativa de Quantidades','Estimativa de Quantidade','Quantidade Estimada','Quantitativo','Quantidades']) || '';
+
+  /* Valor */
+  let valorTxt = extrairCampo(celulas, ['Valor Estimado da Contratação','Valor Estimado da Contratacao','Valor Total Estimado','Valor Estimado','Valor Global','Valor Total','Valor Previsto','Valor']);
   if (!valorTxt || !/\d/.test(valorTxt)){
     const m = t.match(/(?:Valor\s+(?:Total\s+)?Estimado|Valor\s+Global)[^\n]{0,60}?R?\$?\s*([\d]{1,3}(?:[.\s]\d{3})*(?:,\d{2})?|\d+(?:[.,]\d{2})?)/i);
     if (m) valorTxt = m[1];
@@ -1265,67 +1033,39 @@ function extrairCamposDFD(texto, paginas){
   }
   campos.valor = normalizarMoeda(valorTxt);
 
-  {
-    const m = t.match(/([\w._%+\-]+@[\w.\-]+\.[A-Za-z]{2,})/);
-    if (m) campos.email = cleanValue(m[1]);
-  }
-  {
-    const m = t.match(/(?:Telefone|Tel|Fone|Ramal)\s*[:\-–—]?\s*(\(?\d{2}\)?\s*[\s\-]?\d{4,5}[\s\-]?\d{4})/i);
-    if (m) campos.telefone = cleanValue(m[1]);
-  }
-
+  { const m = t.match(/([\w._%+\-]+@[\w.\-]+\.[A-Za-z]{2,})/); if (m) campos.email = cleanValue(m[1]); }
+  { const m = t.match(/(?:Telefone|Tel|Fone|Ramal)\s*[:\-–—]?\s*(\(?\d{2}\)?\s*[\s\-]?\d{4,5}[\s\-]?\d{4})/i); if (m) campos.telefone = cleanValue(m[1]); }
   {
     let m = t.match(/(?:N[º°º]?\s*(?:do\s*)?DFD|DFD\s*n?[º°º]?)\s*[:\-–—]?\s*(\d{1,6}\s*\/\s*\d{2,4})/i);
     if (!m) m = t.match(/\bDFD\s+(\d{1,6}\s*\/\s*\d{2,4})/i);
     if (m) campos.numero = cleanValue(m[1]).replace(/\s*\/\s*/, '/');
   }
 
-  /* ---------- Objeto (texto longo, delimitação estrita) ---------- */
+  /* Objeto */
   {
     const STOP_OBJETO = [
-      'Justificativa da Necessidade',
-      'Justificativa da Necessidade Pública',
-      'Justificativa da Necessidade Pública (Fundamentada)',
-      'Justificativa da Demanda',
-      'Justificativa da Contratação',
-      'Justificativa',
-      'Estimativa de Quantidades',
-      'Estimativa de Quantidade',
-      'Alinhamento ao Plano',
-      'Alinhamento ao PCA',
-      'Enquadramento Legal',
-      'Fundamentação Legal',
-      'Requisitos da Contratação',
-      'Levantamento de Mercado',
-      'Estimativa Preliminar de Preços',
-      'Estimativa de Preços',
-      'Descrição da Solução',
-      'Justificativa para Parcelamento',
-      'Resultados Pretendidos',
-      'Providências Prévias',
-      'Posicionamento Conclusivo'
+      'Justificativa da Necessidade','Justificativa da Necessidade Pública',
+      'Justificativa da Necessidade Pública (Fundamentada)','Justificativa da Demanda',
+      'Justificativa da Contratação','Justificativa',
+      'Estimativa de Quantidades','Estimativa de Quantidade',
+      'Alinhamento ao Plano','Alinhamento ao PCA',
+      'Enquadramento Legal','Fundamentação Legal',
+      'Requisitos da Contratação','Levantamento de Mercado',
+      'Estimativa Preliminar de Preços','Estimativa de Preços',
+      'Descrição da Solução','Justificativa para Parcelamento',
+      'Resultados Pretendidos','Providências Prévias','Posicionamento Conclusivo',
+      'Dotação Orçamentária','Fonte de Recurso','Modalidade Pretendida',
+      'Critério de Julgamento','Prazo de Execução','Local de Entrega',
+      'Condições de Pagamento','Fiscal Titular','Gestor do Contrato'
     ];
-
-    const labelObj = buscarLabelCelula(celulas, [
-      'Descrição Resumida do Objeto','Descrição do Objeto',
-      'Descrição do Objeto da Contratação',
-      'Objeto da Contratação','Objeto da Contratacao',
-      'Objeto da Demanda','Objeto da Necessidade','Objeto'
-    ]);
-
+    const labelObj = buscarLabelCelula(celulas, ['Descrição Resumida do Objeto','Descrição do Objeto','Descrição do Objeto da Contratação','Objeto da Contratação','Objeto da Contratacao','Objeto da Demanda','Objeto da Necessidade','Objeto']);
     if (labelObj){
       const inline = extrairValorDeLabel(celulas, labelObj);
       const bloco  = extrairBlocoColuna(celulas, labelObj, STOP_OBJETO);
-      campos.objeto = (bloco && bloco.length > (inline || '').length)
-        ? bloco.slice(0, 1500)
-        : (inline || '').slice(0, 1500);
+      campos.objeto = (bloco && bloco.length > (inline || '').length) ? bloco.slice(0, 1500) : (inline || '').slice(0, 1500);
     }
     if (!campos.objeto){
-      const inicio = [
-        'Descrição Resumida do Objeto','Descrição do Objeto',
-        'Descrição do Objeto da Contratação',
-        'Objeto da Contratação','Objeto da Demanda','Objeto'
-      ];
+      const inicio = ['Descrição Resumida do Objeto','Descrição do Objeto','Descrição do Objeto da Contratação','Objeto da Contratação','Objeto da Demanda','Objeto'];
       for (const rot of inicio){
         const b = extrairBloco(t, rot, STOP_OBJETO, { maxLen: 1500 });
         if (b && b.length > 5){ campos.objeto = b; break; }
@@ -1333,49 +1073,32 @@ function extrairCamposDFD(texto, paginas){
     }
   }
 
-  /* ---------- Justificativa (texto longo, delimitação estrita) ---------- */
+  /* Justificativa */
   {
     const STOP_JUST = [
-      'Estimativa de Quantidades',
-      'Estimativa de Quantidade',
+      'Estimativa de Quantidades','Estimativa de Quantidade',
       'Estimativa de Quantidades e Memória de Cálculo',
-      'Alinhamento ao Plano',
-      'Alinhamento ao PCA',
-      'Enquadramento Legal',
-      'Fundamentação Legal',
-      'Requisitos da Contratação',
-      'Levantamento de Mercado',
-      'Estimativa Preliminar de Preços',
-      'Estimativa de Preços',
-      'Descrição da Solução',
-      'Justificativa para Parcelamento',
-      'Resultados Pretendidos',
-      'Providências Prévias',
-      'Posicionamento Conclusivo',
-      'Unidade Requisitante','Unidade Demandante',
-      'Setor Requisitante','Setor Demandante',
+      'Alinhamento ao Plano','Alinhamento ao PCA',
+      'Enquadramento Legal','Fundamentação Legal',
+      'Requisitos da Contratação','Levantamento de Mercado',
+      'Estimativa Preliminar de Preços','Estimativa de Preços',
+      'Descrição da Solução','Justificativa para Parcelamento',
+      'Resultados Pretendidos','Providências Prévias','Posicionamento Conclusivo',
+      'Unidade Requisitante','Unidade Demandante','Setor Requisitante','Setor Demandante',
       'Responsável pela Demanda','Responsável Técnico','Responsável',
       'Valor Estimado','Valor Global','Valor',
       'Cargo / Função','Cargo/Função','Cargo','Função',
       'Processo Administrativo','Processo',
-      'Servidores','Quantidade','Item','Prioridade','Prazo'
+      'Servidores','Quantidade','Item','Prioridade','Prazo',
+      'Dotação Orçamentária','Fonte de Recurso','Modalidade Pretendida',
+      'Critério de Julgamento','Prazo de Execução','Local de Entrega',
+      'Condições de Pagamento'
     ];
-
-    const labelJ = buscarLabelCelula(celulas, [
-      'Justificativa da Necessidade Pública (Fundamentada)',
-      'Justificativa da Necessidade Pública',
-      'Justificativa da Necessidade',
-      'Justificativa da Demanda',
-      'Justificativa da Contratação',
-      'Descrição da Necessidade',
-      'Justificativa'
-    ]);
+    const labelJ = buscarLabelCelula(celulas, ['Justificativa da Necessidade Pública (Fundamentada)','Justificativa da Necessidade Pública','Justificativa da Necessidade','Justificativa da Demanda','Justificativa da Contratação','Descrição da Necessidade','Justificativa']);
     if (labelJ){
       const inline = extrairValorDeLabel(celulas, labelJ);
       const bloco  = extrairBlocoColuna(celulas, labelJ, STOP_JUST);
-      campos.justificativa = (bloco && bloco.length > (inline || '').length)
-        ? bloco.slice(0, 2000)
-        : (inline || '').slice(0, 2000);
+      campos.justificativa = (bloco && bloco.length > (inline || '').length) ? bloco.slice(0, 2000) : (inline || '').slice(0, 2000);
     }
     if (!campos.justificativa){
       let j = extrairBloco(t, 'Justificativa da Necessidade Pública (Fundamentada)', STOP_JUST, { maxLen: 2000 });
@@ -1389,42 +1112,43 @@ function extrairCamposDFD(texto, paginas){
     }
   }
 
-  /* ---------- Fallback linha-âncora p/ campos simples ---------- */
-  if (!campos.orgao){
-    campos.orgao = extrairPorRotulo(t, [
-      'ÓRGÃO / ENTIDADE','ORGAO / ENTIDADE','ÓRGÃO ENTIDADE','ORGAO ENTIDADE',
-      'ÓRGÃO','ORGAO','ENTIDADE'
-    ], { maxLen: 200, maxLinhasAdiante: 3 });
+  /* Fallbacks regex */
+  if (!campos.dotacao){
+    const m = t.match(/(?:Dota[çc][ãa]o\s+Or[çc]ament[áa]ria|Rubrica)[^\n:]*[:\-–—]?\s*([^\n]{3,80})/i);
+    if (m) campos.dotacao = cleanValue(m[1]);
   }
-  if (!campos.unidade){
-    campos.unidade = extrairPorRotulo(t, [
-      'Unidade Requisitante','Unidade Demandante','Setor Requisitante',
-      'Setor Demandante','Unidade Solicitante','Setor Solicitante',
-      'Unidade / Setor Demandante','Unidade / Setor'
-    ], { maxLen: 200, maxLinhasAdiante: 3 });
+  if (!campos.modalidade){
+    const m = t.match(/\b(Preg[ãa]o\s+Eletr[ôo]nico|Concorr[êe]ncia\s+Eletr[ôo]nica|Dispensa\s+Eletr[ôo]nica|Inexigibilidade|Leil[ãa]o|Di[áa]logo\s+Competitivo)\b/i);
+    if (m) campos.modalidade = cleanValue(m[1]);
   }
-  if (!campos.responsavel){
-    campos.responsavel = extrairPorRotulo(t, [
-      'Responsável pela Demanda','Responsavel pela Demanda','Responsável da Demanda',
-      'Responsável Técnico','Responsavel Tecnico','Responsável pela Elaboração',
-      'Responsável pela Solicitação','Responsável','Solicitante'
-    ], { maxLen: 160, maxLinhasAdiante: 3 });
+  if (!campos.criterio){
+    const m = t.match(/\b(Menor\s+Pre[çc]o|Maior\s+Desconto|Melhor\s+T[ée]cnica|T[ée]cnica\s+e\s+Pre[çc]o|Maior\s+Lance|Maior\s+Retorno\s+Econ[ôo]mico)\b/i);
+    if (m) campos.criterio = cleanValue(m[1]);
   }
-  if (!campos.cargo){
-    campos.cargo = extrairPorRotulo(t, [
-      'Cargo / Função','Cargo/Função','Cargo / Funcao','Cargo/Funcao',
-      'Cargo e Função','Cargo ou Função','Cargo','Função'
-    ], { maxLen: 160, maxLinhasAdiante: 3 });
+  if (!campos.prazoExecucao){
+    const m = t.match(/(?:Prazo\s+de\s+(?:Execu[çc][ãa]o|Entrega|Vig[êe]ncia))[^\n:]*[:\-–—]?\s*(\d{1,3}\s*(?:dias|meses|ano[s]?))/i);
+    if (m) campos.prazoExecucao = cleanValue(m[1]);
   }
+  if (!campos.fiscalTitular){
+    const m = t.match(/(?:Fiscal\s+(?:Titular|do\s+Contrato))[^\n:]*[:\-–—]?\s*([A-ZÀ-Ú][^\n]{3,80})/);
+    if (m) campos.fiscalTitular = cleanValue(m[1]);
+  }
+  if (!campos.gestorContrato){
+    const m = t.match(/(?:Gestor\s+(?:do\s+Contrato|Contratual))[^\n:]*[:\-–—]?\s*([A-ZÀ-Ú][^\n]{3,80})/);
+    if (m) campos.gestorContrato = cleanValue(m[1]);
+  }
+
+  /* Fallback linha-âncora */
+  if (!campos.orgao) campos.orgao = extrairPorRotulo(t, ['ÓRGÃO / ENTIDADE','ORGAO / ENTIDADE','ÓRGÃO ENTIDADE','ORGAO ENTIDADE','ÓRGÃO','ORGAO','ENTIDADE'], { maxLen: 200, maxLinhasAdiante: 3 });
+  if (!campos.unidade) campos.unidade = extrairPorRotulo(t, ['Unidade Requisitante','Unidade Demandante','Setor Requisitante','Setor Demandante','Unidade Solicitante','Setor Solicitante','Unidade / Setor Demandante','Unidade / Setor'], { maxLen: 200, maxLinhasAdiante: 3 });
+  if (!campos.responsavel) campos.responsavel = extrairPorRotulo(t, ['Responsável pela Demanda','Responsavel pela Demanda','Responsável da Demanda','Responsável Técnico','Responsavel Tecnico','Responsável pela Elaboração','Responsável pela Solicitação','Responsável','Solicitante'], { maxLen: 160, maxLinhasAdiante: 3 });
+  if (!campos.cargo) campos.cargo = extrairPorRotulo(t, ['Cargo / Função','Cargo/Função','Cargo / Funcao','Cargo/Funcao','Cargo e Função','Cargo ou Função','Cargo','Função'], { maxLen: 160, maxLinhasAdiante: 3 });
   if (!campos.processo){
-    campos.processo = extrairPorRotulo(t, [
-      'Processo Administrativo','Nº do Processo','Número do Processo',
-      'Numero do Processo','Processo'
-    ], { maxLen: 80, maxLinhasAdiante: 3 });
+    campos.processo = extrairPorRotulo(t, ['Processo Administrativo','Nº do Processo','Número do Processo','Numero do Processo','Processo'], { maxLen: 80, maxLinhasAdiante: 3 });
     if (campos.processo && !/\d/.test(campos.processo)) campos.processo = '';
   }
 
-  /* ---------- Higienização final ---------- */
+  /* Higienização */
   if (campos.responsavel){
     const partes = campos.responsavel.split(/\s+/).filter(Boolean);
     if (partes.length < 2 || !/[A-ZÀ-Ú]/.test(campos.responsavel)) campos.responsavel = '';
@@ -1433,57 +1157,57 @@ function extrairCamposDFD(texto, paginas){
     const low = campos.cargo.toLowerCase().trim();
     if (['função','funcao','cargo','/','—','-','n/a'].includes(low)) campos.cargo = '';
   }
-  if (campos.unidade && campos.orgao && campos.unidade === campos.orgao){
-    campos.unidade = '';
-  }
-  if (campos.unidade && campos.orgao
-      && normBusca(campos.unidade).startsWith(normBusca(campos.orgao))){
+  if (campos.unidade && campos.orgao && campos.unidade === campos.orgao) campos.unidade = '';
+  if (campos.unidade && campos.orgao && normBusca(campos.unidade).startsWith(normBusca(campos.orgao))){
     campos.unidade = campos.unidade.slice(campos.orgao.length).replace(/^[\s\-–—:]+/, '');
   }
 
-  /* ---------- v2.5.1 · Sanitização anti-paginação (defesa em profundidade) ---------- */
-  ['objeto', 'justificativa', 'unidade', 'orgao', 'responsavel', 'cargo'].forEach(k => {
+  /* Anti-paginação */
+  Object.keys(campos).forEach(k => {
     if (typeof campos[k] === 'string' && campos[k]){
       campos[k] = campos[k]
         .replace(/[\[\]·•\-–—]*\s*(?:P[áa]gina|Page)\s+\d+\s*(?:de|of|\/)\s*\d+\s*[\[\]·•\-–—]*/gi, ' ')
-        .replace(/\s{2,}/g, ' ')
-        .trim();
+        .replace(/\s{2,}/g, ' ').trim();
     }
   });
-
   Object.keys(campos).forEach(k => {
     if (typeof campos[k] === 'string') campos[k] = cleanValue(campos[k]);
   });
-
   return campos;
 }
 
-/* =====================================================================
-   10.11 · APLICAÇÃO DOS CAMPOS + LOGO NO ETP
-   ===================================================================== */
+/* ---------- APLICAÇÃO ---------- */
 function aplicarImportacaoDFD(){
   try {
-    if (!dfdExtraido){
-      toast('Nenhum DFD carregado. Importe o arquivo primeiro.');
-      return;
-    }
-
+    if (!dfdExtraido){ toast('Nenhum DFD carregado. Importe o arquivo primeiro.'); return; }
     const c = dfdExtraido.campos || {};
-    const setV = (id, v) => {
-      const el = document.getElementById(id);
-      if (el && v) el.value = String(v);
-    };
+    const setV = (id, v) => { const el = document.getElementById(id); if (el && v) el.value = String(v); };
 
-    if (c.objeto)        setV('objeto', c.objeto);
-    if (c.unidade)       setV('unidade', c.unidade);
-    if (c.responsavel)   setV('responsavel', c.responsavel);
-    if (c.cargo)         setV('cargoResponsavel', c.cargo);
-    if (c.email)         setV('email', c.email);
-    if (c.telefone)      setV('telefone', c.telefone);
-    if (c.processo)      setV('processo', c.processo);
-    if (c.justificativa) setV('necessidade', c.justificativa);
-    if (c.orgao)         setV('orgao', c.orgao);
-    if (c.uasg)          setV('uasg', c.uasg);
+    if (c.objeto)             setV('objeto', c.objeto);
+    if (c.unidade)            setV('unidade', c.unidade);
+    if (c.responsavel)        setV('responsavel', c.responsavel);
+    if (c.cargo)              setV('cargoResponsavel', c.cargo);
+    if (c.email)              setV('email', c.email);
+    if (c.telefone)           setV('telefone', c.telefone);
+    if (c.processo)           setV('processo', c.processo);
+    if (c.justificativa)      setV('necessidade', c.justificativa);
+    if (c.orgao)              setV('orgao', c.orgao);
+    if (c.uasg)               setV('uasg', c.uasg);
+
+    if (c.dotacao)            setV('dotacaoOrcamentaria', c.dotacao);
+    if (c.fonteRecurso)       setV('fonteRecurso', c.fonteRecurso);
+    if (c.modalidade)         setV('modalidadePretendida', c.modalidade);
+    if (c.criterio)           setV('criterioJulgamento', c.criterio);
+
+    if (c.prazoExecucao)      setV('prazoExecucao', c.prazoExecucao);
+    if (c.localEntrega)       setV('localEntrega', c.localEntrega);
+    if (c.condicoesPagamento) setV('condicoesPagamento', c.condicoesPagamento);
+
+    if (c.fiscalTitular)      setV('fiscalTitular', c.fiscalTitular);
+    if (c.fiscalSubstituto)   setV('fiscalSubstituto', c.fiscalSubstituto);
+    if (c.gestorContrato)     setV('gestorContrato', c.gestorContrato);
+
+    if (c.qtdDescricao)       setV('qtdDescricao', c.qtdDescricao);
 
     if (c.numero){
       const justEl = document.getElementById('pcaJustificativa');
@@ -1494,10 +1218,7 @@ function aplicarImportacaoDFD(){
 
     if (c.valor){
       let primeiro = document.querySelector('#tbPreco tr');
-      if (!primeiro){
-        if (typeof addPreco === 'function') addPreco();
-        primeiro = document.querySelector('#tbPreco tr');
-      }
+      if (!primeiro){ if (typeof addPreco === 'function') addPreco(); primeiro = document.querySelector('#tbPreco tr'); }
       if (primeiro){
         const itemEl  = primeiro.querySelector('[data-k="item"]');
         const fonteEl = primeiro.querySelector('[data-k="fonte"]');
@@ -1511,14 +1232,31 @@ function aplicarImportacaoDFD(){
       }
     }
 
-    let origemLogo = 'default';
-    if (dfdExtraido.logo){
-      aplicarLogoCapturada(dfdExtraido.logo, 'dfd');
-      origemLogo = 'dfd';
-    } else if (dfdExtraido.logoJson){
-      aplicarLogoCapturada(dfdExtraido.logoJson, 'dfd');
-      origemLogo = 'dfd';
+    if (c.qtdDescricao){
+      let primeiroQ = document.querySelector('#tbQtd tr');
+      if (!primeiroQ){ if (typeof addQtd === 'function') addQtd(); primeiroQ = document.querySelector('#tbQtd tr'); }
+      if (primeiroQ){
+        const descEl = primeiroQ.querySelector('[data-k="descricao"]');
+        const memEl  = primeiroQ.querySelector('[data-k="memoria"]');
+        if (descEl && !descEl.value) descEl.value = c.objeto ? c.objeto.slice(0, 120) : c.qtdDescricao.slice(0, 120);
+        if (memEl && !memEl.value)   memEl.value  = c.qtdDescricao.slice(0, 240);
+      }
     }
+
+    const lstAprov = document.getElementById('listaAprovadores');
+    if (lstAprov && c.fiscalTitular){
+      const primeiroCard = lstAprov.querySelector('.aprov-card');
+      const nomeEl  = primeiroCard?.querySelector('[data-a="nome"]');
+      const cargoEl = primeiroCard?.querySelector('[data-a="cargo"]');
+      const papelEl = primeiroCard?.querySelector('[data-a="papel"]');
+      if (nomeEl && !nomeEl.value)  nomeEl.value  = c.fiscalTitular;
+      if (cargoEl && !cargoEl.value) cargoEl.value = 'Fiscal Titular do Contrato';
+      if (papelEl) papelEl.value = 'Fiscal Técnico';
+    }
+
+    let origemLogo = 'default';
+    if (dfdExtraido.logo){ aplicarLogoCapturada(dfdExtraido.logo, 'dfd'); origemLogo = 'dfd'; }
+    else if (dfdExtraido.logoJson){ aplicarLogoCapturada(dfdExtraido.logoJson, 'dfd'); origemLogo = 'dfd'; }
 
     const qtdAplicados = Object.keys(c).filter(k => c[k]).length;
     const msgLogo = origemLogo === 'dfd' ? ' · logotipo herdado do DFD' : '';
@@ -1527,43 +1265,40 @@ function aplicarImportacaoDFD(){
     goTo(0);
 
     setTimeout(() => {
-      ['objeto','unidade','responsavel','cargoResponsavel','necessidade','processo','orgao']
-        .forEach(id => {
-          const el = document.getElementById(id);
-          if (el && el.value){
-            el.style.transition = 'box-shadow .4s';
-            el.style.boxShadow = '0 0 0 3px rgba(16,185,129,.35)';
-            setTimeout(() => el.style.boxShadow = '', 1400);
-          }
-        });
+      ['objeto','unidade','responsavel','cargoResponsavel','necessidade','processo','orgao',
+       'dotacaoOrcamentaria','fonteRecurso','modalidadePretendida','criterioJulgamento',
+       'prazoExecucao','localEntrega','condicoesPagamento',
+       'fiscalTitular','fiscalSubstituto','gestorContrato','qtdDescricao'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el && el.value){
+          el.style.transition = 'box-shadow .4s';
+          el.style.boxShadow = '0 0 0 3px rgba(16,185,129,.35)';
+          setTimeout(() => el.style.boxShadow = '', 1400);
+        }
+      });
     }, 200);
-
   } catch(err){
     console.error('[DFD] Falha ao aplicar importação:', err);
     toast('Erro ao aplicar o DFD: ' + (err?.message || err));
   }
 }
 
-/** Injeta uma logo (dataURL) na UI, marca a origem e destaca visualmente. */
 function aplicarLogoCapturada(dataUrl, origem = 'dfd'){
   if (!dataUrl) return;
   logoDataUrl = dataUrl;
   logoOrigem  = origem;
-
   const img     = document.getElementById('logoPreviewImg');
   const empty   = document.getElementById('logoDropzoneEmpty');
   const preview = document.getElementById('logoDropzonePreview');
   const dz      = document.getElementById('logoDropzone');
   const nameEl  = document.getElementById('logoPreviewName');
   const sizeEl  = document.getElementById('logoPreviewSize');
-
   if (img)     img.src = dataUrl;
   if (nameEl)  nameEl.textContent = origem === 'dfd' ? 'logotipo-herdado-do-dfd.png' : 'logotipo.png';
   if (sizeEl)  sizeEl.textContent = origem === 'dfd' ? '— herdado do DFD —' : '— carregado —';
   empty?.classList.add('hidden');
   preview?.classList.remove('hidden');
   dz?.classList.add('has-file');
-
   if (dz){
     dz.style.transition = 'box-shadow .5s';
     dz.style.boxShadow = '0 0 0 4px rgba(16,185,129,.45)';
@@ -1572,26 +1307,15 @@ function aplicarLogoCapturada(dataUrl, origem = 'dfd'){
 }
 
 /* =====================================================================
-   10.12 · SANITIZAÇÃO FINAL (RENDER) — v2.5.1 defesa em profundidade
-   =====================================================================
-   Remove artefatos de paginação que possam ter escapado do parser:
-   "Página 1 de 8", "Page 1 of 8", "[Página 1 de 8]", "· Página 1 de 8 ·".
-   Aplicada antes de qualquer texto entrar no pdfMake.
+   10.12 · SANITIZAÇÃO FINAL (RENDER)
    ===================================================================== */
 function sanitizarTextoRender(s){
   if (s == null) return '';
   let t = String(s);
-
-  /* Formatos completos (com ou sem brackets/bullets) */
   t = t.replace(/[\[\]·•\-–—]*\s*(?:P[áa]gina|Page)\s+\d+\s*(?:de|of|\/)\s*\d+\s*[\[\]·•\-–—]*/gi, ' ');
-
-  /* Formato "N de M" ou "N / M" isolado em linha (fallback) */
   t = t.replace(/^\s*\d+\s*(?:de|\/)\s*\d+\s*$/gm, ' ');
-
-  /* Recolhe espaços e limpa pontuação órfã nas bordas */
   t = t.replace(/\s{2,}/g, ' ').trim();
   t = t.replace(/^[\s:;\-–—,\.]+|[\s:;\-–—,\.]+$/g, '').trim();
-
   return t;
 }
 
@@ -1621,19 +1345,25 @@ const campo = (r, v) => ({ stack: [
 ]});
 
 const secao = (n, t, blocos) => ({ stack: [
-  { table: { widths:['*'], body: [[{ text:`${n} — ${t}`, bold:true, fontSize:10, color:'#FFFFFF', fillColor:BRAND, margin:[8,6,8,6], characterSpacing:0.3 }]] },
-    layout:'noBorders', margin:[0,12,0,7] },
+  { table: { widths:['*'], body: [[{ text:`${n} — ${t}`, bold:true, fontSize:10, color:'#FFFFFF', fillColor:BRAND, margin:[8,6,8,6], characterSpacing:0.3 }]] }, layout:'noBorders', margin:[0,12,0,7] },
   ...blocos
 ]});
 
-function tabelaDados(header, rows, widths){
+function tabelaDados(header, rows, widths, opts = {}){
+  const { wrapCols = [] } = opts;
   if (!rows.length) return { text:'— não informado —', italics:true, color:'#94A3B8', fontSize:9.5, margin:[0,2,0,8] };
   return {
     table: {
       headerRows: 1, widths,
       body: [
-        header.map(h => ({ text: sanitizarTextoRender(h), bold:true, fontSize:7.5, color:'#FFFFFF', fillColor:BRAND2, margin:[4,5,4,5] })),
-        ...rows.map(r => r.map(c => ({ text: sanitizarTextoRender(String(c ?? '')), fontSize:8.5, color:'#1E293B', margin:[4,4,4,4] })))
+        header.map(h => ({ text: sanitizarTextoRender(h), bold:true, fontSize:7.5, color:'#FFFFFF', fillColor:BRAND2, margin:[4,5,4,5], noWrap:false })),
+        ...rows.map(r => r.map((c, idx) => ({
+          text: sanitizarTextoRender(String(c ?? '')),
+          fontSize: wrapCols.includes(idx) ? 8 : 8.5,
+          color:'#1E293B',
+          margin:[4,4,4,4],
+          noWrap:false
+        })))
       ]
     },
     layout: { hLineWidth:()=>0.5, vLineWidth:()=>0.5, hLineColor:()=>LINEC, vLineColor:()=>LINEC,
@@ -1654,15 +1384,12 @@ const moeda = n => Number(n || 0).toLocaleString('pt-BR', { style:'currency', cu
 const dataBR = iso => { if (!iso) return new Date().toLocaleDateString('pt-BR'); const [y,m,d] = iso.split('-'); return `${d}/${m}/${y}`; };
 
 /* =====================================================================
-   12. BLOCOS DO PDF
+   12. BLOCOS PDF
    ===================================================================== */
 function blocoCapa(d, conf, meta){
   const logoImg = logoDataUrl || logoPadraoPng;
   const logo = logoImg ? { image: logoImg, width: 78, alignment: 'center', margin: [0, 0, 0, 14] } : { text: '', margin: [0, 0, 0, 6] };
-
-  /* v2.5.1 · Sanitização final dos valores exibidos na capa */
   const objetoLimpo = sanitizarTextoRender(d.id.objeto);
-
   const resumo = [
     ['Nº do ETP',             `${sanitizarTextoRender(d.id.numero) || '—'} / ${sanitizarTextoRender(d.id.exercicio) || '—'}`],
     ['Processo',              sanitizarTextoRender(d.id.processo) || '—'],
@@ -1692,8 +1419,7 @@ function blocoCapa(d, conf, meta){
         layout:{ hLineWidth:()=>0.5, vLineWidth:()=>0.5, hLineColor:()=>LINEC, vLineColor:()=>LINEC,
                  paddingLeft:()=>0, paddingRight:()=>0, paddingTop:()=>0, paddingBottom:()=>0 } },
       { text:'', margin:[0,18,0,0] },
-      { text:`Documento emitido eletronicamente em ${new Date().toLocaleString('pt-BR')} · TAG ${meta.tag}`,
-        alignment:'center', fontSize:7, color:'#94A3B8' }
+      { text:`Documento emitido eletronicamente em ${new Date().toLocaleString('pt-BR')} · TAG ${meta.tag}`, alignment:'center', fontSize:7, color:'#94A3B8' }
     ],
     pageBreak: 'after'
   };
@@ -1705,26 +1431,16 @@ function blocoNota(d){
     { text:'Termo de Abertura', alignment:'center', fontSize:9, color:MUTED, margin:[0,0,0,18] },
     { table: { widths:['*'], body: [[{ stack: [
       { text:'FINALIDADE LEGAL DO DOCUMENTO', fontSize:8, bold:true, color:BRAND2, characterSpacing:0.8, margin:[0,0,0,8] },
-      { text:'O presente Estudo Técnico Preliminar (ETP) constitui documento constitutivo da fase preparatória da contratação, elaborado em observância ao disposto no art. 18, § 1º, da Lei nº 14.133/2021, e tem por finalidade:',
-        fontSize:9.5, alignment:'justify', lineHeight:1.45, color:'#1E293B', margin:[0,0,0,8] },
-      { ul: [
-        'Caracterizar o interesse público e descrever a necessidade a ser atendida;',
-        'Demonstrar a melhor solução dentre as alternativas de mercado analisadas;',
-        'Fundamentar a estimativa de quantidades, de preços e a definição dos requisitos;',
-        'Evidenciar os resultados pretendidos e os ganhos de economicidade;',
-        'Subsidiar a elaboração do Termo de Referência ou Projeto Básico.'
-      ], fontSize:9.5, lineHeight:1.4, color:'#1E293B', margin:[0,0,0,8] },
-      { text:'A instrução processual observa, ainda, o disposto no art. 5º da Lei nº 14.133/2021, quanto aos princípios do planejamento, da transparência, da eficiência e da motivação dos atos administrativos, bem como o art. 11, que impõe a padronização e a rastreabilidade documental dos processos de contratação.',
-        fontSize:9.5, alignment:'justify', lineHeight:1.45, color:'#1E293B', margin:[0,0,0,8] },
-      { text:'O documento é rastreável e auditável, sendo identificado por TAG de autenticação exclusiva e hash de integridade SHA-256, aptos à validação automatizada por sistemas de auditoria (LicitaAudit).',
-        fontSize:9.5, alignment:'justify', lineHeight:1.45, color:'#1E293B' }
+      { text:'O presente Estudo Técnico Preliminar (ETP) constitui documento constitutivo da fase preparatória da contratação, elaborado em observância ao disposto no art. 18, § 1º, da Lei nº 14.133/2021, e tem por finalidade:', fontSize:9.5, alignment:'justify', lineHeight:1.45, color:'#1E293B', margin:[0,0,0,8] },
+      { ul: ['Caracterizar o interesse público e descrever a necessidade a ser atendida;','Demonstrar a melhor solução dentre as alternativas de mercado analisadas;','Fundamentar a estimativa de quantidades, de preços e a definição dos requisitos;','Evidenciar os resultados pretendidos e os ganhos de economicidade;','Subsidiar a elaboração do Termo de Referência ou Projeto Básico.'], fontSize:9.5, lineHeight:1.4, color:'#1E293B', margin:[0,0,0,8] },
+      { text:'A instrução processual observa, ainda, o disposto no art. 5º da Lei nº 14.133/2021, quanto aos princípios do planejamento, da transparência, da eficiência e da motivação dos atos administrativos, bem como o art. 11, que impõe a padronização e a rastreabilidade documental dos processos de contratação.', fontSize:9.5, alignment:'justify', lineHeight:1.45, color:'#1E293B', margin:[0,0,0,8] },
+      { text:'O documento é rastreável e auditável, sendo identificado por TAG de autenticação exclusiva e hash de integridade SHA-256, aptos à validação automatizada por sistemas de auditoria (LicitaAudit).', fontSize:9.5, alignment:'justify', lineHeight:1.45, color:'#1E293B' }
     ], margin:[16,16,16,16] }]] },
       layout:{ hLineWidth:()=>1, vLineWidth:()=>1, hLineColor:()=>BRAND2, vLineColor:()=>BRAND2,
                paddingLeft:()=>0, paddingRight:()=>0, paddingTop:()=>0, paddingBottom:()=>0 } },
     { text:'', margin:[0,18,0,0] },
     { canvas: [{ type:'line', x1:60, y1:0, x2:455, y2:0, lineWidth:0.6, lineColor:LINEC }] },
-    { text:`Processo administrativo nº ${sanitizarTextoRender(d.id.processo) || '—'} · ETP nº ${sanitizarTextoRender(d.id.numero) || '—'}/${sanitizarTextoRender(d.id.exercicio) || '—'}`,
-      alignment:'center', fontSize:8, color:MUTED, margin:[0,10,0,0] }
+    { text:`Processo administrativo nº ${sanitizarTextoRender(d.id.processo) || '—'} · ETP nº ${sanitizarTextoRender(d.id.numero) || '—'}/${sanitizarTextoRender(d.id.exercicio) || '—'}`, alignment:'center', fontSize:8, color:MUTED, margin:[0,10,0,0] }
   ], pageBreak: 'after' };
 }
 
@@ -1769,10 +1485,14 @@ function blocoCorpo(d){
       campo('Causa-raiz', d.nec.causaRaiz),
       campo('Público-alvo / beneficiários', d.nec.publicoAlvo)
     ]),
-    secao('II', 'ALINHAMENTO AO PCA', [
+    secao('II', 'ALINHAMENTO AO PCA E ENQUADRAMENTO ORÇAMENTÁRIO', [
       campo('Previsão no PCA', d.pca.previsto),
       campo('Item / código do PCA', d.pca.item),
-      campo('Justificativa do alinhamento', d.pca.justificativa)
+      campo('Justificativa do alinhamento', d.pca.justificativa),
+      campo('Dotação orçamentária', d.enq.dotacao),
+      campo('Fonte de recurso', d.enq.fonte),
+      campo('Modalidade pretendida', d.enq.modalidade),
+      campo('Critério de julgamento', d.enq.criterio)
     ]),
     secao('III', 'REQUISITOS DA CONTRATAÇÃO', [
       campo('Critérios de sustentabilidade', d.req.sustentaveis.length ? d.req.sustentaveis.map(s => '- ' + s).join('\n') : ''),
@@ -1782,6 +1502,7 @@ function blocoCorpo(d){
       campo('Embalagem, entrega e recebimento', d.req.entrega)
     ]),
     secao('IV', 'ESTIMATIVA DE QUANTIDADES E MEMÓRIA DE CÁLCULO', [
+      campo('Descrição quantitativa (extraída do DFD)', d.qtd.descricao),
       tabelaDados(['ITEM','DESCRIÇÃO','QTD.','UN.','MEMÓRIA DE CÁLCULO'],
         d.qtd.itens.map(i => [i.item, i.descricao, i.quantidade, i.unidade, i.memoria]),
         [32,'*',40,34,'*']),
@@ -1801,10 +1522,12 @@ function blocoCorpo(d){
           sanitizarTextoRender(i.item)  || '—',
           sanitizarTextoRender(i.fonte) || '—',
           moeda(i.unitario),
-          sanitizarTextoRender(i.quantidade),
+          sanitizarTextoRender(i.quantidade) || '—',
           moeda(i.total)
         ]),
-        ['*','*',70,40,75]
+        /* v2.6 · Larguras fixas — soma 495pt em A4 */
+        [115, 195, 70, 40, 75],
+        { wrapCols: [1] }
       ),
       { table: { widths:['*',150], body: [[
         { text:'VALOR TOTAL ESTIMADO DA CONTRATAÇÃO', bold:true, fontSize:9, color:BRAND, margin:[8,8,8,8], fillColor:'#F0FDF4' },
@@ -1816,7 +1539,10 @@ function blocoCorpo(d){
     secao('VII', 'DESCRIÇÃO DA SOLUÇÃO COMO UM TODO', [
       campo('Descrição integrada da solução', d.solucao.descricao),
       campo('Entregas e prazos', d.solucao.entregas),
-      campo('Ciclo de vida e sustentabilidade', d.solucao.ciclo)
+      campo('Ciclo de vida e sustentabilidade', d.solucao.ciclo),
+      campo('Prazo de execução', d.prazos.execucao),
+      campo('Local de entrega', d.prazos.local),
+      campo('Condições de pagamento', d.prazos.pagamento)
     ]),
     secao('VIII', 'JUSTIFICATIVA PARA PARCELAMENTO (OU NÃO)', [
       campo('Decisão sobre parcelamento', d.parcel.decisao),
@@ -1861,28 +1587,50 @@ function blocoAprovacao(d){
     while (cells.length < 2) cells.push({ text:'' });
     rows.push(cells);
   }
+
+  const g = d.governanca || {};
+  const temGovernanca = g.fiscalTitular || g.fiscalSubstituto || g.gestor;
+
+  const blocoGovernanca = temGovernanca
+    ? [{ stack: [
+        { text:'GOVERNANÇA CONTRATUAL', fontSize:8, bold:true, color:BRAND2, characterSpacing:0.8, margin:[0,0,0,8] },
+        { table: {
+            widths:['*','*','*'],
+            body: [[
+              { text:'FISCAL TITULAR',    fontSize:7, bold:true, color:BRAND2, fillColor:'#F8FAFC', alignment:'center', margin:[6,5,6,3] },
+              { text:'FISCAL SUBSTITUTO', fontSize:7, bold:true, color:BRAND2, fillColor:'#F8FAFC', alignment:'center', margin:[6,5,6,3] },
+              { text:'GESTOR DO CONTRATO',fontSize:7, bold:true, color:BRAND2, fillColor:'#F8FAFC', alignment:'center', margin:[6,5,6,3] }
+            ],[
+              { text: sanitizarTextoRender(g.fiscalTitular)    || '—', fontSize:8.5, color:'#1E293B', alignment:'center', margin:[6,4,6,6] },
+              { text: sanitizarTextoRender(g.fiscalSubstituto) || '—', fontSize:8.5, color:'#1E293B', alignment:'center', margin:[6,4,6,6] },
+              { text: sanitizarTextoRender(g.gestor)           || '—', fontSize:8.5, color:'#1E293B', alignment:'center', margin:[6,4,6,6] }
+            ]]
+          },
+          layout:{ hLineWidth:()=>0.5, vLineWidth:()=>0.5, hLineColor:()=>LINEC, vLineColor:()=>LINEC,
+                   paddingLeft:()=>0, paddingRight:()=>0, paddingTop:()=>0, paddingBottom:()=>0 },
+          margin:[0,0,0,14] }
+      ]}]
+    : [];
+
   return { stack: [
     { text:'FOLHA DE APROVAÇÃO E VALIDAÇÃO', bold:true, fontSize:12, color:BRAND, characterSpacing:0.8, margin:[0,6,0,2] },
     { text:'Documento sujeito a manifestação dos agentes abaixo identificados', fontSize:8.5, color:MUTED, margin:[0,0,0,16] },
+    ...blocoGovernanca,
     { table:{ widths:['*','*'], body:rows }, layout:'noBorders', dontBreakRows:true, margin:[0,0,0,10] },
     { text:'', margin:[0,10,0,0] },
     { table: { widths:['*'], body: [[{ stack:[
       { text:'DECLARAÇÃO DE CIÊNCIA', fontSize:7.5, bold:true, color:BRAND2, characterSpacing:0.6, margin:[0,0,0,5] },
-      { text:'Os agentes signatários declaram ter analisado o presente Estudo Técnico Preliminar e manifestam-se de acordo com o conteúdo técnico, a estimativa de quantidades, a estimativa de preços e o posicionamento conclusivo quanto à viabilidade da contratação, nos termos do art. 18 da Lei nº 14.133/2021.',
-        fontSize:8.5, alignment:'justify', lineHeight:1.4, color:'#334155' }
+      { text:'Os agentes signatários declaram ter analisado o presente Estudo Técnico Preliminar e manifestam-se de acordo com o conteúdo técnico, a estimativa de quantidades, a estimativa de preços e o posicionamento conclusivo quanto à viabilidade da contratação, nos termos do art. 18 da Lei nº 14.133/2021.', fontSize:8.5, alignment:'justify', lineHeight:1.4, color:'#334155' }
     ], margin:[12,11,12,11] }]] },
       layout:{ hLineWidth:()=>0.5, vLineWidth:()=>0.5, hLineColor:()=>LINEC, vLineColor:()=>LINEC,
                paddingLeft:()=>0, paddingRight:()=>0, paddingTop:()=>0, paddingBottom:()=>0 } },
-    { text:`${sanitizarTextoRender(d.id.unidade) || ''}${d.id.unidade && d.id.orgao ? ' — ' : ''}${sanitizarTextoRender(d.id.orgao) || ''}, ${dataBR(d.id.data)}.`,
-      alignment:'right', fontSize:9, color:'#334155', margin:[0,22,0,0] }
+    { text:`${sanitizarTextoRender(d.id.unidade) || ''}${d.id.unidade && d.id.orgao ? ' — ' : ''}${sanitizarTextoRender(d.id.orgao) || ''}, ${dataBR(d.id.data)}.`, alignment:'right', fontSize:9, color:'#334155', margin:[0,22,0,0] }
   ], pageBreak:'before' };
 }
 
 function blocoAutenticacao(d, meta){
-  const caixaLayout = {
-    hLineWidth:()=>1.2, vLineWidth:()=>1.2, hLineColor:()=>BRAND, vLineColor:()=>BRAND,
-    paddingLeft:()=>0, paddingRight:()=>0, paddingTop:()=>0, paddingBottom:()=>0
-  };
+  const caixaLayout = { hLineWidth:()=>1.2, vLineWidth:()=>1.2, hLineColor:()=>BRAND, vLineColor:()=>BRAND,
+    paddingLeft:()=>0, paddingRight:()=>0, paddingTop:()=>0, paddingBottom:()=>0 };
   return { stack: [
     { text:'', margin:[0,40,0,0] },
     { text:'AUTENTICAÇÃO E RASTREABILIDADE', alignment:'center', bold:true, fontSize:13, color:BRAND, characterSpacing:1 },
@@ -1908,23 +1656,20 @@ function blocoAutenticacao(d, meta){
     { text:'', margin:[0,16,0,0] },
     { table: { widths:['*'], body: [[{ stack: [
       { text:'AVISO DE AUDITORIA E INTEGRAÇÃO', fontSize:7.5, bold:true, color:'#92400E', characterSpacing:0.6, margin:[0,0,0,5] },
-      { text:'Este documento é auditável eletronicamente. A autenticidade pode ser verificada pela conferência da TAG exclusiva e do hash SHA-256 junto ao repositório institucional ou ao módulo LicitaAudit. Qualquer alteração posterior de conteúdo invalida o hash registrado, caracterizando adulteração documental.',
-        fontSize:8, alignment:'justify', lineHeight:1.4, color:'#78350F', margin:[0,0,0,6] },
-      { text:'A ausência de assinatura física não prejudica a validade do ato, nos termos do art. 4º, incisos I e II, e do art. 5º da Lei nº 14.133/2021, e da MP nº 2.200-2/2001.',
-        fontSize:7.5, italics:true, color:'#92400E' }
+      { text:'Este documento é auditável eletronicamente. A autenticidade pode ser verificada pela conferência da TAG exclusiva e do hash SHA-256 junto ao repositório institucional ou ao módulo LicitaAudit. Qualquer alteração posterior de conteúdo invalida o hash registrado, caracterizando adulteração documental.', fontSize:8, alignment:'justify', lineHeight:1.4, color:'#78350F', margin:[0,0,0,6] },
+      { text:'A ausência de assinatura física não prejudica a validade do ato, nos termos do art. 4º, incisos I e II, e do art. 5º da Lei nº 14.133/2021, e da MP nº 2.200-2/2001.', fontSize:7.5, italics:true, color:'#92400E' }
     ], margin:[12,11,12,11] }]] },
       layout:{ hLineWidth:()=>1, vLineWidth:()=>1, hLineColor:()=>'#FCD34D', vLineColor:()=>'#FCD34D',
                paddingLeft:()=>0, paddingRight:()=>0, paddingTop:()=>0, paddingBottom:()=>0 }, fillColor:'#FFFBEB' },
     { text:'', margin:[0,26,0,0] },
     { canvas:[{ type:'line', x1:100, y1:0, x2:415, y2:0, lineWidth:0.5, lineColor:LINEC }] },
-    { text:'LicitaETP · Módulo de Estudo Técnico Preliminar · Padrão de auditoria LicitaAudit',
-      alignment:'center', fontSize:7, color:'#94A3B8', margin:[0,8,0,0] },
+    { text:'LicitaETP · Módulo de Estudo Técnico Preliminar · Padrão de auditoria LicitaAudit', alignment:'center', fontSize:7, color:'#94A3B8', margin:[0,8,0,0] },
     { text:'— FIM DO DOCUMENTO —', alignment:'center', fontSize:7, bold:true, color:'#94A3B8', characterSpacing:1, margin:[0,4,0,0] }
   ], pageBreak:'before' };
 }
 
 /* =====================================================================
-   13. MONTAGEM FINAL DO PDF
+   13. MONTAGEM
    ===================================================================== */
 function montarDocumento(d, conf, meta){
   return {
@@ -1935,27 +1680,21 @@ function montarDocumento(d, conf, meta){
       author: d.id.orgao || 'LicitaETP',
       subject: 'ETP — Lei nº 14.133/2021, art. 18, § 1º',
       keywords: `ETP, Licitações, Lei 14.133/2021, ${meta.tag}`,
-      creator: 'LicitaETP v2.5.1'
+      creator: 'LicitaETP v2.6'
     },
     header: (cp, total) => {
       if (cp <= 3 || cp === total) return null;
-      return {
-        margin: [40, 18, 40, 0],
-        columns: [
-          { text: sanitizarTextoRender((d.id.orgao || '').toUpperCase()), fontSize:7, color:'#94A3B8', bold:true },
-          { text: `ETP nº ${sanitizarTextoRender(d.id.numero) || '—'}/${sanitizarTextoRender(d.id.exercicio) || '—'}`, fontSize:7, color:'#94A3B8', alignment:'right' }
-        ]
-      };
+      return { margin: [40, 18, 40, 0], columns: [
+        { text: sanitizarTextoRender((d.id.orgao || '').toUpperCase()), fontSize:7, color:'#94A3B8', bold:true },
+        { text: `ETP nº ${sanitizarTextoRender(d.id.numero) || '—'}/${sanitizarTextoRender(d.id.exercicio) || '—'}`, fontSize:7, color:'#94A3B8', alignment:'right' }
+      ]};
     },
     footer: (cp, total) => {
       if (cp === 1) return null;
-      return {
-        margin: [40, 14, 40, 0],
-        columns: [
-          { text: `TAG ${meta.tag}`, fontSize:6.5, color:'#94A3B8' },
-          { text: `Página ${cp} de ${total}`, fontSize:6.5, color:'#94A3B8', alignment:'right' }
-        ]
-      };
+      return { margin: [40, 14, 40, 0], columns: [
+        { text: `TAG ${meta.tag}`, fontSize:6.5, color:'#94A3B8' },
+        { text: `Página ${cp} de ${total}`, fontSize:6.5, color:'#94A3B8', alignment:'right' }
+      ]};
     },
     content: [
       blocoCapa(d, conf, meta),
@@ -1978,14 +1717,12 @@ function nomeArquivo(){
   const ex  = (document.getElementById('exercicio')?.value || '').match(/\d{4}/)?.[0] || String(new Date().getFullYear());
   return `ETP_${num}_${ex}.pdf`;
 }
-
 function gerarCodigo(){
   const A = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let s = '';
   for (let i = 0; i < 8; i++) s += A[Math.floor(Math.random() * A.length)];
   return s;
 }
-
 async function sha256Hex(str){
   try {
     const buf = new TextEncoder().encode(str);
@@ -2003,7 +1740,7 @@ async function sha256Hex(str){
 }
 
 /* =====================================================================
-   15. GERAÇÃO DO PDF
+   15. GERAR PDF
    ===================================================================== */
 async function gerarPDF(){
   const d = coletarDados();
@@ -2011,24 +1748,20 @@ async function gerarPDF(){
     toast('Preencha ao menos Órgão/Entidade e Objeto na etapa de Identificação.');
     goTo(0); return;
   }
-
   const conf = calcularConformidade(d);
   const exercicio = (d.id.exercicio || '').match(/\d{4}/)?.[0] || String(new Date().getFullYear());
   const tag = `LICITAETP::ETP::${gerarCodigo()}::${exercicio}`;
   const emitidoEm = new Date().toLocaleString('pt-BR');
   const hash = await sha256Hex(JSON.stringify({ etp:d, conformidade:conf.score, tag, emitidoEm }));
   const meta = { tag, hash, emitidoEm, exercicio };
-
   if (!d.id.numero || d.id.numero === '042' || !document.getElementById('numeroEtp').dataset.userEdited){
     const novo = consumirNumeroETP(exercicio);
     document.getElementById('numeroEtp').value = novo;
     d.id.numero = novo;
     meta.numeroConsumido = novo;
   }
-
   const doc = montarDocumento(d, conf, meta);
   const arquivo = nomeArquivo();
-
   pdfMake.createPdf(doc).download(arquivo, () => {
     toast(`PDF gerado: ${arquivo} · ${tag}`);
     console.info('[LicitaAudit] Payload de auditoria:', { tag, hash, arquivo, conformidade: conf.score, logoOrigem, dados:d });
@@ -2036,7 +1769,7 @@ async function gerarPDF(){
 }
 
 /* =====================================================================
-   16. EXPORTAR JSON DE AUDITORIA
+   16. EXPORTAR JSON
    ===================================================================== */
 async function exportarJSON(){
   const d = coletarDados();
@@ -2046,10 +1779,9 @@ async function exportarJSON(){
   const emitidoEm = new Date().toISOString();
   const hash = await sha256Hex(JSON.stringify({ etp:d, tag, emitidoEm }));
   const pacote = {
-    sistema:'LicitaETP', versao:'2.5.1', trilha:'LICITAETP', tipo:'auditoria',
+    sistema:'LicitaETP', versao:'2.6.0', trilha:'LICITAETP', tipo:'auditoria',
     tag, hash, emitidoEm,
-    logo: logoDataUrl,
-    logoOrigem,
+    logo: logoDataUrl, logoOrigem,
     conformidade: { score:conf.score, incisos:conf.linhas.map(l => ({ inciso:l.n, status:l.status, pct:l.pct })) },
     etp:d
   };
@@ -2063,15 +1795,14 @@ async function exportarJSON(){
 }
 
 /* =====================================================================
-   17. SALVAR / CARREGAR RASCUNHO
+   17. RASCUNHO
    ===================================================================== */
 function salvarRascunho(){
   try {
     const pacote = {
-      sistema:'LicitaETP', versao:'2.5.1', tipo:'rascunho',
+      sistema:'LicitaETP', versao:'2.6.0', tipo:'rascunho',
       salvoEm: new Date().toISOString(),
-      logo: logoDataUrl,
-      logoOrigem,
+      logo: logoDataUrl, logoOrigem,
       dados: coletarDados()
     };
     const json = JSON.stringify(pacote, null, 2);
@@ -2087,10 +1818,7 @@ function salvarRascunho(){
     toast(`Rascunho salvo: ${arquivo}`);
   } catch(e){ console.error(e); toast('Falha ao salvar rascunho.'); }
 }
-
-function abrirCarregarRascunho(){
-  document.getElementById('jsonFile')?.click();
-}
+function abrirCarregarRascunho(){ document.getElementById('jsonFile')?.click(); }
 
 async function processarArquivoJSON(file){
   try {
@@ -2111,7 +1839,6 @@ async function processarArquivoJSON(file){
 
 function aplicarDados(d){
   const setV = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
-
   setV('orgao', d.id?.orgao); setV('uasg', d.id?.uasg); setV('unidade', d.id?.unidade);
   setV('exercicio', d.id?.exercicio); setV('numeroEtp', d.id?.numero);
   if (d.id?.numero) document.getElementById('numeroEtp').dataset.userEdited = '1';
@@ -2122,11 +1849,18 @@ function aplicarDados(d){
   setV('necessidade', d.nec?.necessidade); setV('causaRaiz', d.nec?.causaRaiz); setV('publicoAlvo', d.nec?.publicoAlvo);
   setV('pcaPrevisto', d.pca?.previsto); setV('pcaItem', d.pca?.item); setV('pcaJustificativa', d.pca?.justificativa);
 
+  /* v2.6 */
+  setV('dotacaoOrcamentaria', d.enq?.dotacao);
+  setV('fonteRecurso', d.enq?.fonte);
+  setV('modalidadePretendida', d.enq?.modalidade);
+  setV('criterioJulgamento', d.enq?.criterio);
+
   const sustSet = new Set(d.req?.sustentaveis || []);
   document.querySelectorAll('input[name="sustent"]').forEach(cb => { cb.checked = sustSet.has(cb.value); });
   setV('reqTecnicos', d.req?.tecnicos); setV('reqHabilitacao', d.req?.habilitacao);
   setV('reqGarantia', d.req?.garantia); setV('reqEntrega', d.req?.entrega);
 
+  setV('qtdDescricao', d.qtd?.descricao);
   const tbQ = document.getElementById('tbQtd');
   if (tbQ){ tbQ.innerHTML = ''; (d.qtd?.itens || []).forEach(addQtd); if (!(d.qtd?.itens||[]).length) addQtd(); }
   setV('metodoQtd', d.qtd?.metodo);
@@ -2142,17 +1876,27 @@ function aplicarDados(d){
   recalcularTotal();
 
   setV('descricaoSolucao', d.solucao?.descricao); setV('entregas', d.solucao?.entregas); setV('cicloVida', d.solucao?.ciclo);
+  /* v2.6 · prazos */
+  setV('prazoExecucao', d.prazos?.execucao);
+  setV('localEntrega', d.prazos?.local);
+  setV('condicoesPagamento', d.prazos?.pagamento);
+
   setV('parcelar', d.parcel?.decisao); setV('itensParcelaveis', d.parcel?.itens); setV('justificativaParcelamento', d.parcel?.justificativa);
   setV('resultados', d.result?.resultados); setV('economicidade', d.result?.economicidade); setV('indicadores', d.result?.indicadores);
   setV('providencias', d.prov?.providencias); setV('correlatas', d.prov?.correlatas); setV('impactoProvidencias', d.prov?.impacto);
   setV('posicionamento', d.conc?.posicionamento); setV('recomendacoes', d.conc?.recomendacoes); setV('conclusao', d.conc?.conclusao);
+
+  /* v2.6 · governança */
+  setV('fiscalTitular', d.governanca?.fiscalTitular);
+  setV('fiscalSubstituto', d.governanca?.fiscalSubstituto);
+  setV('gestorContrato', d.governanca?.gestor);
 
   const lst = document.getElementById('listaAprovadores');
   if (lst){ lst.innerHTML = ''; (d.aprov || []).forEach(addAprovador); if (!(d.aprov||[]).length) addAprovador({ papel:'Elaborador' }); }
 }
 
 /* =====================================================================
-   18. DRAG & DROP — LOGOTIPO MANUAL
+   18. DROPZONE LOGO
    ===================================================================== */
 function inicializarDropzoneLogo(){
   const dz = document.getElementById('logoDropzone');
@@ -2169,7 +1913,6 @@ function inicializarDropzoneLogo(){
     if (dz.classList.contains('has-file')) return;
     input.click();
   });
-
   ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => {
     e.preventDefault(); e.stopPropagation(); dz.classList.add('dragover');
   }));
@@ -2181,9 +1924,7 @@ function inicializarDropzoneLogo(){
     e.preventDefault(); e.stopPropagation(); dz.classList.remove('dragover');
     const f = e.dataTransfer?.files?.[0]; if (f) processar(f);
   });
-  input.addEventListener('change', e => {
-    const f = e.target.files?.[0]; if (f) processar(f);
-  });
+  input.addEventListener('change', e => { const f = e.target.files?.[0]; if (f) processar(f); });
   removeBtn?.addEventListener('click', e => {
     e.stopPropagation();
     logoDataUrl = null; logoOrigem = 'default';
@@ -2216,13 +1957,12 @@ function inicializarDropzoneLogo(){
 }
 
 /* =====================================================================
-   19. DRAG & DROP — DFD
+   19. DROPZONE DFD
    ===================================================================== */
 function inicializarDropzoneDFD(){
   const dz = document.getElementById('dfdDropzone');
   const input = document.getElementById('dfdFile');
   if (!dz || !input) return;
-
   dz.addEventListener('click', () => input.click());
   ['dragenter','dragover'].forEach(ev => dz.addEventListener(ev, e => {
     e.preventDefault(); e.stopPropagation(); dz.classList.add('dragover');
@@ -2319,11 +2059,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }, 1200);
 
-  if (deveExibirWelcome()){
-    setTimeout(abrirWelcome, 500);
-  }
+  if (deveExibirWelcome()){ setTimeout(abrirWelcome, 500); }
 });
 
 /* =====================================================================
-   FIM — LicitaETP v2.5.1
+   FIM — LicitaETP v2.6
    ===================================================================== */
