@@ -1,12 +1,10 @@
 /* =====================================================================
-   OMNILICIT · Logo Loader
-   Carrega a logo oficial da pasta raiz e converte para Base64.
-   ✅ FIX: path alinhado com LicitaReq → 'logo-omnlicit.png'
+   OMNILICIT · Logo Loader (IIFE) — LicitaETP v5.0
+   ✅ Path: 'logo-omnlicit.png' (nome oficial, sem o 2º "i")
    ===================================================================== */
 'use strict';
 
 const OmniLogo = (() => {
-  // ⚠️ ATENÇÃO: o nome oficial do arquivo é 'logo-omnlicit.png' (sem o segundo 'i')
   const LOGO_PATH = 'logo-omnlicit.png';
 
   const FALLBACK_SVG = `
@@ -46,16 +44,14 @@ const OmniLogo = (() => {
   async function load() {
     if (cacheDataUrl) return cacheDataUrl;
 
-    // 1) Tenta aproveitar do core OmniLicit se já carregado (LicitaReq)
     if (window.OmniLicit?.carregarLogoBase64) {
       try {
         cacheDataUrl = await window.OmniLicit.carregarLogoBase64(LOGO_PATH);
         cacheOrigem  = 'oficial';
         return cacheDataUrl;
-      } catch (_) { /* continua para tentativa local */ }
+      } catch (_) { }
     }
 
-    // 2) fetch + FileReader (mesma estratégia do omnlicit-core.js)
     try {
       const resp = await fetch(LOGO_PATH, { cache: 'force-cache' });
       if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
@@ -63,7 +59,6 @@ const OmniLogo = (() => {
       cacheDataUrl = await fileToDataUrl(blob);
       cacheOrigem  = 'oficial';
     } catch (err) {
-      // 3) Fallback via <img> + canvas (file:// restritivo)
       try {
         const img = new Image();
         img.crossOrigin = 'anonymous';
@@ -77,7 +72,7 @@ const OmniLogo = (() => {
         cacheDataUrl = c.toDataURL('image/png');
         cacheOrigem  = 'oficial';
       } catch (err2) {
-        console.warn('[OmniLogo] Falha ao carregar logo oficial, usando fallback SVG.', err2);
+        console.warn('[OmniLogo] Fallback SVG.', err2);
         cacheDataUrl = await svgToPngDataUrl(FALLBACK_SVG);
         cacheOrigem  = 'fallback';
       }
@@ -85,10 +80,10 @@ const OmniLogo = (() => {
     return cacheDataUrl;
   }
 
-  function get()       { return cacheDataUrl; }
-  function origem()    { return cacheOrigem; }
-  function set(dUrl, o = 'manual') { cacheDataUrl = dUrl; cacheOrigem = o; }
-  function clear()     { cacheDataUrl = null; cacheOrigem = 'none'; }
+  function get()    { return cacheDataUrl; }
+  function origem() { return cacheOrigem; }
+  function set(d, o = 'manual') { cacheDataUrl = d; cacheOrigem = o; }
+  function clear()  { cacheDataUrl = null; cacheOrigem = 'none'; }
 
   return { load, get, origem, set, clear, LOGO_PATH };
 })();
