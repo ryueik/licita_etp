@@ -39,16 +39,38 @@ function alternarTema() {
 
 /* ---------- IDENTIDADE VISUAL ---------- */
 async function injetarIdentidadeVisual() {
+  const logoDataUrl = OmniLogo.get();
+  if (!logoDataUrl) return;
+
+  /* 1. Logo no header */
   const brand = document.getElementById('brandLogo');
-  if (brand && OmniLogo.get()) {
-    brand.innerHTML = `<img src="${OmniLogo.get()}" alt="OmniLicit"
+  if (brand) {
+    brand.innerHTML = `<img src="${logoDataUrl}" alt="OmniLicit"
                             style="width:100%;height:100%;object-fit:contain;border-radius:10px" />`;
   }
+
+  /* 2. Logo no modal welcome */
   const w = document.getElementById('welcomeLogo');
-  if (w && OmniLogo.get()) {
-    w.innerHTML = `<img src="${OmniLogo.get()}" alt="OmniLicit"
+  if (w) {
+    w.innerHTML = `<img src="${logoDataUrl}" alt="OmniLicit"
                         style="width:100%;height:100%;object-fit:contain;border-radius:16px" />`;
   }
+
+  /* 3. ✅ FAVICON — usa a logo real */
+  const favicon = document.getElementById('favicon');
+  if (favicon) {
+    favicon.type = 'image/png';
+    favicon.href = logoDataUrl;
+  }
+
+  /* 4. Preload da logo para performance em PDF */
+  try {
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = 'image';
+    link.href = logoDataUrl;
+    document.head.appendChild(link);
+  } catch (_) {}
 }
 
 /* ---------- NUMERAÇÃO ETP ---------- */
@@ -113,7 +135,6 @@ function abrirAjuda() {
 /* ---------- ESTADO ---------- */
 let logoDataUrl    = null;
 let logoOrigem     = 'default';
-let logoPadraoPng  = null;
 let current = 0;
 let panels  = [];
 let TOTAL   = 0;
@@ -695,7 +716,7 @@ async function gerarPDF() {
     const resultado = await PDFEngine.gerar(d, conf, {
       exercicio,
       arquivoNome: arquivo,
-      logoDataUrl: OmniLogo.get() || logoDataUrl || logoPadraoPng
+      logoDataUrl: OmniLogo.get() || logoDataUrl
     });
     toast(`PDF gerado: ${resultado.arquivo} · ${resultado.tag}`);
   } catch (err) {
@@ -966,8 +987,8 @@ function toast(msg) {
 document.addEventListener('DOMContentLoaded', async () => {
   aplicarTema(lerTemaSalvo());
 
+  /* ✅ Carrega logo (arquivo ou SVG inline) e injeta em header/welcome/favicon */
   await OmniLogo.load();
-  logoPadraoPng = OmniLogo.get();
   await injetarIdentidadeVisual();
 
   const dtEl = document.getElementById('dataElaboracao');
@@ -1036,6 +1057,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   console.info(
     `[OmniLicit] LicitaETP v5.0 carregado\n` +
     `  Logo origem : ${OmniLogo.origem()}\n` +
+    `  Logo path   : ${OmniLogo.path() || 'inline'}\n` +
     `  Módulos     : OmniLogo · DFDParser · PDFEngine`
   );
 });
