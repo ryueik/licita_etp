@@ -468,4 +468,198 @@ const PDFEngine = (() => {
             alignment: 'center', margin: [6, 4, 6, 6] }
         ]
       ]},
-        layout: { hLineWidth: () => 0.
+        layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5,
+                  hLineColor: () => COR.line, vLineColor: () => COR.line,
+                  paddingLeft: () => 0, paddingRight: () => 0,
+                  paddingTop: () => 0, paddingBottom: () => 0 },
+        margin: [0, 0, 0, 14] }
+    ]}] : [];
+
+    return { stack: [
+      { text: 'FOLHA DE APROVAÇÃO E VALIDAÇÃO', bold: true, fontSize: 14,
+        color: COR.executivo, alignment: 'center', characterSpacing: 0.8, margin: [0, 6, 0, 2] },
+      { text: 'Documento sujeito a manifestação dos agentes abaixo identificados',
+        fontSize: 8.5, color: COR.muted, alignment: 'center', margin: [0, 0, 0, 16] },
+      ...blocoGov,
+      { table: { widths: ['*','*'], body: rows }, layout: 'noBorders',
+        dontBreakRows: true, margin: [0, 0, 0, 10] },
+      { text: '', margin: [0, 10, 0, 0] },
+      { table: { widths: ['*'], body: [[{ stack: [
+        { text: 'DECLARAÇÃO DE CIÊNCIA', fontSize: 7.5, bold: true,
+          color: COR.petroleoD, characterSpacing: 0.6, margin: [0, 0, 0, 5] },
+        { text: 'Os agentes signatários declaram ter analisado o presente Estudo Técnico Preliminar e manifestam-se de acordo com o conteúdo técnico, a estimativa de quantidades, a estimativa de preços e o posicionamento conclusivo quanto à viabilidade da contratação, nos termos do art. 18 da Lei nº 14.133/2021.',
+          fontSize: 8.5, alignment: 'justify', lineHeight: 1.4, color: '#334155' }
+      ], margin: [12, 11, 12, 11] }]]},
+        layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5,
+                  hLineColor: () => COR.line, vLineColor: () => COR.line,
+                  paddingLeft: () => 0, paddingRight: () => 0,
+                  paddingTop: () => 0, paddingBottom: () => 0 } },
+      { text: `${sanitizar(d.id.unidade) || ''}${d.id.unidade && d.id.orgao ? ' — ' : ''}${sanitizar(d.id.orgao) || ''}, ${(d.id.data || '').split('-').reverse().join('/') || new Date().toLocaleDateString('pt-BR')}.`,
+        alignment: 'right', fontSize: 9, color: COR.muted, margin: [0, 22, 0, 0] }
+    ], pageBreak: 'before' };
+  }
+
+  /* =====================================================================
+     ✅ PÁGINA DE AUTENTICAÇÃO — Réplica do LicitaReq
+     ===================================================================== */
+  function linhaMeta(chave, valor) {
+    return [
+      { text: chave + ':', fontSize: 8, bold: true, color: '#334155',
+        fillColor: '#F1F5F9', margin: [8, 5, 8, 5] },
+      { text: valor || '—', fontSize: 8, color: COR.ink,
+        font: /^[A-F0-9]{64}$/.test(valor || '') ? 'Courier' : undefined,
+        margin: [8, 5, 8, 5] },
+    ];
+  }
+
+  function layoutMeta() {
+    return {
+      hLineColor: () => '#CBD5E1', vLineColor: () => '#CBD5E1',
+      hLineWidth: () => 0.4, vLineWidth: () => 0.4,
+      paddingLeft: () => 0, paddingRight: () => 0,
+      paddingTop: () => 0, paddingBottom: () => 0,
+    };
+  }
+
+  function blocoAutenticacao(d, meta) {
+    return {
+      pageBreak: 'before',
+      stack: [{
+        unbreakable: true,
+        stack: [
+          { text: '', margin: [0, 4, 0, 0] },
+          { text: '[SEG]', fontSize: 14, bold: true, alignment: 'center',
+            color: COR.petroleoD, letterSpacing: 2, margin: [0, 0, 0, 10] },
+          { text: 'AUTENTICAÇÃO E RASTREABILIDADE', fontSize: 14, bold: true,
+            alignment: 'center', color: COR.petroleoD, margin: [0, 0, 0, 3] },
+          { text: 'Documento Oficial OmniLicit · Integração LicitaAudit',
+            fontSize: 8.5, alignment: 'center', color: COR.muted, margin: [0, 0, 0, 14] },
+
+          { table: { widths: ['*'], body: [[{
+            stack: [
+              { text: 'TAG DE AUTENTICAÇÃO', fontSize: 8, bold: true,
+                alignment: 'center', color: '#C2ECE7', margin: [0, 0, 0, 3] },
+              { text: meta.tag, fontSize: 12, bold: true, alignment: 'center', color: COR.white },
+            ],
+            fillColor: COR.petroleo, margin: [16, 12, 16, 12],
+          }]]}, layout: 'noBorders', margin: [0, 0, 0, 12] },
+
+          { table: {
+            widths: ['35%', '*'],
+            body: [
+              linhaMeta('Hash SHA-256', meta.hash),
+              linhaMeta('Emitido em',        meta.emitidoEm),
+              linhaMeta('Sistema Emissor',   VERSAO_MODULO),
+              linhaMeta('Órgão Emissor',     d.id.orgao || '—'),
+              linhaMeta('Expediente',        `ETP ${sanitizar(d.id.numero) || '—'}/${sanitizar(d.id.exercicio) || '—'}`),
+              linhaMeta('Processo',          sanitizar(d.id.processo) || '—'),
+              linhaMeta('Score de Conformidade', `${meta.confScore != null ? meta.confScore : '—'}/100`),
+              linhaMeta('Tag de Integração', 'PREFIRO_TAG: OmniLicit_ETP_Oficial'),
+            ],
+          }, layout: layoutMeta(), margin: [0, 0, 0, 12] },
+
+          { table: { widths: ['*'], body: [[{
+            stack: [
+              { text: '[!]  AVISO IMPORTANTE', fontSize: 8.5, bold: true,
+                color: COR.avisoBold, margin: [0, 0, 0, 4] },
+              { text: 'Este documento foi gerado automaticamente pelo sistema LicitaETP (OmniLicit) ' +
+                      'e possui TAG de autenticação única rastreável pelo OmniLicit Audit. A validade ' +
+                      'jurídica do presente ETP está condicionada à conferência pela assessoria jurídica, ' +
+                      'pelo controle interno e pela autoridade competente.',
+                fontSize: 8, color: COR.avisoTx, lineHeight: 1.4, alignment: 'justify' },
+            ],
+            fillColor: COR.avisoBg, margin: [14, 10, 14, 10],
+          }]]}, layout: 'noBorders', margin: [0, 0, 0, 12] },
+
+          { table: { widths: ['*'], body: [[{
+            stack: [
+              { text: '•  SELO DIGITAL OMNILICIT', fontSize: 8, bold: true,
+                alignment: 'center', color: COR.petroleoD, margin: [0, 0, 0, 3] },
+              { text: 'Documento íntegro · Não adulterado · Rastreável', fontSize: 7,
+                alignment: 'center', color: COR.muted, margin: [0, 3, 0, 0] },
+              { text: meta.tag, fontSize: 7, alignment: 'center',
+                color: COR.muted, font: 'Courier', margin: [0, 4, 0, 0] },
+            ],
+            fillColor: COR.petroleoLt, margin: [14, 10, 14, 10],
+          }]]}, layout: 'noBorders' },
+        ],
+      }],
+    };
+  }
+
+  /* ---------- MONTAGEM ---------- */
+  function montar(d, conf, meta, logoDataUrl) {
+    return {
+      pageSize: 'A4',
+      pageMargins: PAGE_MARGINS,
+      info: {
+        title: `Estudo Técnico Preliminar nº ${d.id.numero || ''}/${d.id.exercicio || ''}`,
+        author: d.id.orgao || VERSAO_MODULO,
+        subject: 'ETP — Lei nº 14.133/2021, art. 18, § 1º',
+        keywords: `ETP, Licitações, Lei 14.133/2021, ${meta.tag}`,
+        creator: VERSAO_MODULO
+      },
+      header: (cp, total) => {
+        if (cp <= 3 || cp === total) return null;
+        return { margin: [40, 18, 40, 0], columns: [
+          { text: sanitizar((d.id.orgao || '').toUpperCase()), fontSize: 7,
+            color: '#94A3B8', bold: true },
+          { text: `ETP nº ${sanitizar(d.id.numero) || '—'}/${sanitizar(d.id.exercicio) || '—'}`,
+            fontSize: 7, color: '#94A3B8', alignment: 'right' }
+        ]};
+      },
+      footer: (cp, total) => {
+        if (cp === 1) return null;
+        return { margin: [40, 14, 40, 0], columns: [
+          { text: `TAG ${meta.tag}`, fontSize: 6.5, color: '#94A3B8' },
+          { text: `Página ${cp} de ${total}`, fontSize: 6.5, color: '#94A3B8',
+            alignment: 'right' }
+        ]};
+      },
+      content: [
+        blocoCapa(d, conf, meta, logoDataUrl),
+        blocoNota(d),
+        blocoConformidade(d, conf, meta),
+        blocoCorpo(d),
+        blocoAprovacao(d),
+        blocoAutenticacao(d, meta)
+      ],
+      defaultStyle: { font: 'Roboto', fontSize: 9.5, color: COR.ink }
+    };
+  }
+
+  async function gerar(dados, conf, opts = {}) {
+    const logoDataUrl = opts.logoDataUrl || OmniLogo.get() || null;
+    const exercicio = opts.exercicio || dados.id.exercicio || String(new Date().getFullYear());
+    const ano = (exercicio.match(/\d{4}/) || [String(new Date().getFullYear())])[0];
+
+    const tag = `OMNILICIT::ETP::${gerarCodigoTag()}::${ano}`;
+    const emitidoEm = new Date().toLocaleString('pt-BR');
+    const hash = await sha256Hex(JSON.stringify({
+      etp: dados, conformidade: conf.score, tag, emitidoEm, modulo: VERSAO_MODULO
+    }));
+    const meta = {
+      tag, hash, emitidoEm, exercicio: ano, modulo: VERSAO_MODULO,
+      confScore: conf.score
+    };
+
+    const doc = montar(dados, conf, meta, logoDataUrl);
+    const arquivo = opts.arquivoNome || `ETP_${dados.id.numero || '001'}_${ano}.pdf`;
+
+    return new Promise(resolve => {
+      pdfMake.createPdf(doc).download(arquivo, () => {
+        console.info('[OmniLicit Audit] Payload emitido:', {
+          tag, hash, arquivo, modulo: VERSAO_MODULO,
+          conformidade: conf.score,
+          logoOrigem: OmniLogo.origem(),
+          dados
+        });
+        resolve({ tag, hash, arquivo });
+      });
+    });
+  }
+
+  return { gerar, montar, COR, VERSAO_MODULO, SISTEMA_AUDIT, sha256Hex };
+})();
+
+window.PDFEngine = PDFEngine;
