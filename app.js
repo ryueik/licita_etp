@@ -1,9 +1,42 @@
 /* =====================================================================
    OMNILICIT · LicitaETP v5.0 — Núcleo da Aplicação
    Tema padrão: DARK · Logo dinâmica · Welcome com persistência
+   ✅ FIX: pdfMake.fonts registrado no boot (Roboto + Courier)
    ===================================================================== */
 'use strict';
 
+/* =====================================================================
+   GUARDA OBRIGATÓRIA: registra fontes do pdfMake
+   O vfs_fonts.js popula pdfMake.vfs, mas NÃO registra fontes em pdfMake.fonts.
+   Sem isso, pdfMake.createPdf falha silenciosamente ao procurar 'Roboto'.
+   ===================================================================== */
+(function registrarFontesPdfMake() {
+  if (typeof pdfMake === 'undefined') {
+    console.error('[PDF] pdfMake não carregou. Verifique o <script> no HTML.');
+    return;
+  }
+
+  if (!pdfMake.fonts) pdfMake.fonts = {};
+
+  if (!pdfMake.fonts.Roboto) {
+    pdfMake.fonts.Roboto = {
+      normal:      'Roboto-Regular.ttf',
+      bold:        'Roboto-Medium.ttf',
+      italics:     'Roboto-Italic.ttf',
+      bolditalics: 'Roboto-MediumItalic.ttf',
+    };
+  }
+
+  if (!pdfMake.fonts.Courier) {
+    pdfMake.fonts.Courier = pdfMake.fonts.Roboto;
+  }
+
+  console.info('[PDF] ✅ Fontes registradas:', Object.keys(pdfMake.fonts).join(', '));
+})();
+
+/* =====================================================================
+   HELPERS GERAIS
+   ===================================================================== */
 const $  = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
@@ -30,11 +63,9 @@ function aplicarTema(tema) {
   if (!sun || !moon) return;
 
   if (tema === 'dark') {
-    // Em dark, mostra ☀️ (ação: mudar para claro)
     sun.style.display  = 'block';
     moon.style.display = 'none';
   } else {
-    // Em light, mostra 🌙 (ação: mudar para escuro)
     moon.style.display = 'block';
     sun.style.display  = 'none';
   }
@@ -72,14 +103,14 @@ async function injetarIdentidadeVisual() {
                         onerror="this.style.display='none'" />`;
   }
 
-  /* 3. ✅ FAVICON — sempre aponta para a logo real */
+  /* 3. Favicon — sempre aponta para a logo real */
   const favicon = document.getElementById('favicon');
   if (favicon) {
     favicon.type = 'image/png';
     favicon.href = logoDataUrl || 'logo-omnlicit.png';
   }
 
-  /* 4. Preload da logo (performance) */
+  /* 4. Preload da logo */
   if (logoDataUrl) {
     try {
       const link = document.createElement('link');
@@ -140,7 +171,6 @@ function abrirWelcome() {
   const m = document.getElementById('welcomeModal');
   if (!m) return;
 
-  // Pré-marca o checkbox conforme preferência anterior
   const cb = document.getElementById('welcomeDontShow');
   if (cb) {
     try { cb.checked = localStorage.getItem(WELCOME_KEY) === '1'; } catch (e) {}
@@ -153,7 +183,6 @@ function abrirWelcome() {
 function fecharWelcome() {
   const cb = document.getElementById('welcomeDontShow');
 
-  // ✅ Persiste a preferência: só salva se o usuário marcou o checkbox
   if (cb?.checked) {
     try { localStorage.setItem(WELCOME_KEY, '1'); } catch (e) {}
   } else {
@@ -167,7 +196,6 @@ function fecharWelcome() {
 }
 
 function abrirAjuda() {
-  // Reabre o welcome mesmo se o usuário já dispensou
   const cb = document.getElementById('welcomeDontShow');
   if (cb) cb.checked = false;
   abrirWelcome();
@@ -653,7 +681,6 @@ function aplicarImportacaoDFD() {
       }
     }
 
-    /* Valor → primeira linha de preço */
     if (c.valor) {
       let primeiro = document.querySelector('#tbPreco tr');
       if (!primeiro) { addPreco(); primeiro = document.querySelector('#tbPreco tr'); }
@@ -670,7 +697,6 @@ function aplicarImportacaoDFD() {
       }
     }
 
-    /* Quantitativo → primeira linha de quantidades */
     if (c.qtdDescricao) {
       let primeiroQ = document.querySelector('#tbQtd tr');
       if (!primeiroQ) { addQtd(); primeiroQ = document.querySelector('#tbQtd tr'); }
@@ -682,7 +708,6 @@ function aplicarImportacaoDFD() {
       }
     }
 
-    /* Governança → primeiro aprovador */
     const lstAprov = document.getElementById('listaAprovadores');
     if (lstAprov && c.fiscalTitular) {
       const primeiroCard = lstAprov.querySelector('.aprov-card');
@@ -694,7 +719,6 @@ function aplicarImportacaoDFD() {
       if (papelEl) papelEl.value = 'Fiscal Técnico';
     }
 
-    /* Logo capturada do PDF */
     let origemLogo = 'default';
     if (dfdExtraido.logo) {
       aplicarLogoCapturada(dfdExtraido.logo, 'dfd');
@@ -754,41 +778,80 @@ function aplicarLogoCapturada(dataUrl, origem = 'dfd') {
 }
 
 /* =====================================================================
-   GERAR PDF
+   GERAR PDF — com logging detalhado
    ===================================================================== */
 async function gerarPDF() {
-  const d = coletarDados();
-
-  if (!d.id.orgao || !d.id.objeto) {
-    toast('Preencha ao menos Órgão/Entidade e Objeto na etapa de Identificação.');
-    goTo(0);
-    return;
-  }
-
-  /* Consome número sequencial do ETP se o usuário não editou */
-  const exMatch = (d.id.exercicio || '').match(/\d{4}/);
-  const exercicio = exMatch ? exMatch[0] : String(new Date().getFullYear());
-
-  if (!d.id.numero || !document.getElementById('numeroEtp').dataset.userEdited) {
-    const novo = consumirNumeroETP(exercicio);
-    document.getElementById('numeroEtp').value = novo;
-    d.id.numero = novo;
-  }
-
-  const conf = calcularConformidade(d);
-  const numLimpo = (d.id.numero || '001').replace(/\D/g, '').padStart(3, '0');
-  const arquivo  = `ETP_${numLimpo}_${exercicio}.pdf`;
+  console.group('📄 [gerarPDF] Início');
 
   try {
+    /* 1. Validação mínima */
+    const d = coletarDados();
+
+    if (!d.id.orgao || !d.id.objeto) {
+      toast('Preencha ao menos Órgão/Entidade e Objeto na etapa de Identificação.');
+      goTo(0);
+      console.groupEnd();
+      return;
+    }
+
+    /* 2. Verifica dependências */
+    if (typeof pdfMake === 'undefined') {
+      console.error('❌ pdfMake não definido');
+      toast('pdfMake não carregou. Recarregue a página.');
+      console.groupEnd();
+      return;
+    }
+    if (typeof PDFEngine === 'undefined' || !PDFEngine.gerar) {
+      console.error('❌ PDFEngine não definido');
+      toast('Módulo de PDF não carregado. Recarregue a página.');
+      console.groupEnd();
+      return;
+    }
+
+    /* 3. Número sequencial do ETP */
+    const exMatch = (d.id.exercicio || '').match(/\d{4}/);
+    const exercicio = exMatch ? exMatch[0] : String(new Date().getFullYear());
+
+    if (!d.id.numero || !document.getElementById('numeroEtp').dataset.userEdited) {
+      const novo = consumirNumeroETP(exercicio);
+      document.getElementById('numeroEtp').value = novo;
+      d.id.numero = novo;
+    }
+
+    /* 4. Conformidade */
+    const conf = calcularConformidade(d);
+    console.log('Conformidade:', conf.score + '%');
+
+    /* 5. Logo */
+    let logoDataUrlAtual = null;
+    if (typeof OmniLogo !== 'undefined' && OmniLogo.get) {
+      logoDataUrlAtual = OmniLogo.get();
+      console.log('Logo origem:', OmniLogo.origem(),
+                  '| tamanho:', logoDataUrlAtual ? (logoDataUrlAtual.length / 1024).toFixed(1) + ' KB' : 'null');
+    }
+
+    /* 6. Nome do arquivo */
+    const numLimpo = (d.id.numero || '001').replace(/\D/g, '').padStart(3, '0');
+    const arquivo = `ETP_${numLimpo}_${exercicio}.pdf`;
+    console.log('Arquivo:', arquivo);
+
+    /* 7. Geração */
+    console.log('Chamando PDFEngine.gerar()...');
     const resultado = await PDFEngine.gerar(d, conf, {
       exercicio,
       arquivoNome: arquivo,
-      logoDataUrl: (typeof OmniLogo !== 'undefined' && OmniLogo.get) ? OmniLogo.get() : (logoDataUrl || null)
+      logoDataUrl: logoDataUrlAtual || logoDataUrl,
     });
+
+    console.log('✅ PDF gerado:', resultado);
     toast(`PDF gerado: ${resultado.arquivo} · ${resultado.tag}`);
+
   } catch (err) {
-    console.error('[PDFEngine]', err);
+    console.error('❌ ERRO em gerarPDF:', err);
+    console.error('Stack:', err?.stack);
     toast('Falha ao gerar PDF: ' + (err?.message || err));
+  } finally {
+    console.groupEnd();
   }
 }
 
@@ -1065,7 +1128,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   /* 1. Tema */
   aplicarTema(lerTemaSalvo());
 
-  /* 2. Logo oficial (arquivo ou SVG inline do loader) */
+  /* 2. Logo oficial */
   if (typeof OmniLogo !== 'undefined' && OmniLogo.load) {
     try { await OmniLogo.load(); } catch (e) { console.warn('[OmniLogo]', e); }
   }
@@ -1105,7 +1168,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   addPreco();
   addAprovador({ papel: 'Elaborador' });
 
-  /* 9. Recalcular total sempre que mexer na tabela de preços */
+  /* 9. Recalcular total */
   document.addEventListener('input', e => {
     if (e.target.closest('#tbPreco')) recalcularTotal();
   });
@@ -1143,7 +1206,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }, 1200);
 
-  /* 13. Welcome modal (só se não dispensado) */
+  /* 13. Welcome modal */
   if (deveExibirWelcome()) setTimeout(abrirWelcome, 500);
 
   /* 14. Log de status */
