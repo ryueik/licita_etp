@@ -1,47 +1,55 @@
 /* =====================================================================
    OMNILICIT · LicitaETP · PDF Engine v5.0
-   Gera o PDF auditável com identidade visual OmniLicit.
+   ✅ Paleta alinhada com LicitaReq (petróleo #00A896)
+   ✅ Página de autenticação replicando o estilo do LicitaReq
    ===================================================================== */
 'use strict';
 
 const PDFEngine = (() => {
 
-  /* ---------- 3.1 Paleta OmniLicit ---------- */
+  /* ---------- Paleta UNIFICADA OmniLicit (idêntica ao LicitaReq) ---------- */
   const COR = {
-    BRAND:     '#0E7C86',   // turquesa executivo
-    BRAND_DK:  '#075056',   // turquesa profundo
-    BRAND_LT:  '#E6F4F5',   // turquesa claro (fills)
-    ACCENT:    '#1E6F5C',   // verde institucional
-    MUTED:     '#64748B',
-    LINE:      '#CBD5E1',
-    TEXT:      '#1E293B',
-    TEXT_SOFT: '#475569'
+    petroleo:   '#00A896',   // turquesa principal
+    petroleoD:  '#007568',   // turquesa profundo
+    petroleo400:'#29B5A7',
+    petroleoLt: '#E6F7F5',   // fundo claro (caixa de valor)
+    executivo:  '#05668D',   // azul executivo
+    executivoD: '#034462',
+    ink:        '#0A0F1E',
+    muted:      '#475569',
+    line:       '#E2E8F0',
+    bg:         '#F8FAFC',
+    white:      '#FFFFFF',
+    avisoBg:    '#FEF3C7',
+    avisoTx:    '#78350F',
+    avisoBold:  '#92400E',
+    ok:         '#059669',
+    warn:       '#B45309',
+    err:        '#DC2626'
   };
-  const PAGE_MARGINS = [42, 48, 42, 52];
+  const PAGE_MARGINS = [40, 62, 40, 78];
   const VERSAO_MODULO = 'OmniLicit LicitaETP v5.0';
   const SISTEMA_AUDIT = 'OmniLicit Audit';
 
-  /* ---------- 3.2 Helpers ---------- */
-  const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
-    ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
-
+  /* ---------- Helpers ---------- */
   const sanitizar = s => {
     if (s == null) return '';
-    let t = String(s);
-    t = t.replace(/[\[\]·•\-–—]*\s*(?:P[áa]gina|Page)\s+\d+\s*(?:de|of|\/)\s*\d+\s*[\[\]·•\-–—]*/gi, ' ');
-    t = t.replace(/^\s*\d+\s*(?:de|\/)\s*\d+\s*$/gm, ' ');
-    t = t.replace(/\s{2,}/g, ' ').trim();
-    t = t.replace(/^[\s:;\-–—,\.]+|[\s:;\-–—,\.]+$/g, '').trim();
-    return t;
+    return String(s)
+      .replace(/[\[\]·•\-–—]*\s*(?:P[áa]gina|Page)\s+\d+\s*(?:de|of|\/)\s*\d+\s*[\[\]·•\-–—]*/gi, ' ')
+      .replace(/^\s*\d+\s*(?:de|\/)\s*\d+\s*$/gm, ' ')
+      .replace(/\s{2,}/g, ' ').trim()
+      .replace(/^[\s:;\-–—,\.]+|[\s:;\-–—,\.]+$/g, '').trim();
   };
 
   const moeda = n => Number(n || 0).toLocaleString('pt-BR',
     { style: 'currency', currency: 'BRL' });
 
-  const dataBR = iso => {
-    if (!iso) return new Date().toLocaleDateString('pt-BR');
-    const [y, m, d] = String(iso).split('-');
-    return `${d}/${m}/${y}`;
+  const formatarDataHora = d => {
+    const dt = d instanceof Date ? d : new Date(d);
+    if (isNaN(dt)) return '—';
+    const p = n => String(n).padStart(2, '0');
+    return p(dt.getDate()) + '/' + p(dt.getMonth()+1) + '/' + dt.getFullYear() +
+           ' ' + p(dt.getHours()) + ':' + p(dt.getMinutes()) + ':' + p(dt.getSeconds());
   };
 
   const gerarCodigoTag = () => {
@@ -63,7 +71,7 @@ const PDFEngine = (() => {
         h1 ^= str.charCodeAt(i); h1 = Math.imul(h1, 16777619) >>> 0;
         h2 = Math.imul(h2 ^ str.charCodeAt(i), 2246822519) >>> 0;
       }
-      const base = (h1.toString(16).padStart(8, '0') + h2.toString(16).padStart(8, '0')).toUpperCase();
+      const base = (h1.toString(16).padStart(8,'0') + h2.toString(16).padStart(8,'0')).toUpperCase();
       return base.repeat(4).slice(0, 64);
     }
   }
@@ -75,16 +83,16 @@ const PDFEngine = (() => {
     const out = []; let ul = [];
     const flush = () => {
       if (ul.length) {
-        out.push({ ul, fontSize: 9.5, lineHeight: 1.3, margin: [0, 0, 0, 6], color: COR.TEXT });
+        out.push({ ul, fontSize: 9.5, lineHeight: 1.3, margin: [0, 0, 0, 6], color: COR.ink });
         ul = [];
       }
     };
     linhas.forEach(l => {
-      if (/^[-•*]\s+/.test(l)) ul.push(l.replace(/^[-•*]\s+/, ''));
+      if (/^[-•*]\s+/.test(l)) ul.push(l.replace(/^[-*•]\s+/, ''));
       else {
         flush();
         out.push({ text: l, fontSize: 9.5, lineHeight: 1.4, alignment: 'justify',
-                   color: COR.TEXT, margin: [0, 0, 0, 6] });
+                   color: COR.ink, margin: [0, 0, 0, 6] });
       }
     });
     flush();
@@ -92,15 +100,15 @@ const PDFEngine = (() => {
   };
 
   const campo = (rotulo, valor) => ({ stack: [
-    { text: rotulo.toUpperCase(), fontSize: 7.5, bold: true, color: COR.ACCENT,
+    { text: rotulo.toUpperCase(), fontSize: 7.5, bold: true, color: COR.petroleoD,
       characterSpacing: 0.6, margin: [0, 7, 0, 3] },
     ...txtBloco(valor)
   ]});
 
   const secao = (n, t, blocos) => ({ stack: [
     { table: { widths: ['*'], body: [[{
-      text: `${n} — ${t}`, bold: true, fontSize: 10, color: '#FFFFFF',
-      fillColor: COR.BRAND, margin: [8, 6, 8, 6], characterSpacing: 0.3
+      text: `${n} — ${t}`, bold: true, fontSize: 10, color: COR.white,
+      fillColor: COR.petroleo, margin: [8, 6, 8, 6], characterSpacing: 0.3
     }]]}, layout: 'noBorders', margin: [0, 12, 0, 7] },
     ...blocos
   ]});
@@ -114,16 +122,16 @@ const PDFEngine = (() => {
         headerRows: 1, widths,
         body: [
           header.map(h => ({ text: sanitizar(h), bold: true, fontSize: 7.5,
-                             color: '#FFFFFF', fillColor: COR.ACCENT,
+                             color: COR.white, fillColor: COR.executivo,
                              margin: [4, 5, 4, 5] })),
           ...rows.map(r => r.map((c, idx) => ({
             text: sanitizar(String(c ?? '')), fontSize: wrapCols.includes(idx) ? 8 : 8.5,
-            color: COR.TEXT, margin: [4, 4, 4, 4]
+            color: COR.ink, margin: [4, 4, 4, 4]
           })))
         ]
       },
       layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5,
-                hLineColor: () => COR.LINE, vLineColor: () => COR.LINE,
+                hLineColor: () => COR.line, vLineColor: () => COR.line,
                 paddingLeft: () => 2, paddingRight: () => 2,
                 paddingTop: () => 1, paddingBottom: () => 1 },
       margin: [0, 2, 0, 10]
@@ -133,17 +141,19 @@ const PDFEngine = (() => {
   function barra(pct) {
     const p = Math.max(0, Math.min(100, Math.round(pct)));
     return { table: { widths: [`${p}%`, `${100 - p}%`], body: [[
-      { text: '', fillColor: p >= 80 ? '#15803D' : p >= 50 ? '#B45309' : '#B91C1C',
+      { text: '', fillColor: p >= 80 ? COR.ok : p >= 50 ? COR.warn : COR.err,
         border: [false, false, false, false], margin: [0, 4, 0, 4] },
       { text: '', fillColor: '#E2E8F0', border: [false, false, false, false],
         margin: [0, 4, 0, 4] }
     ]]}, layout: 'noBorders' };
   }
 
-  /* ---------- 3.3 Blocos ---------- */
+  /* =====================================================================
+     CAPA
+     ===================================================================== */
   function blocoCapa(d, conf, meta, logoDataUrl) {
     const logo = logoDataUrl
-      ? { image: logoDataUrl, width: 140, alignment: 'center', margin: [0, 0, 0, 18] }
+      ? { image: logoDataUrl, fit: [110, 110], alignment: 'center', margin: [0, 0, 0, 14] }
       : { text: '', margin: [0, 0, 0, 6] };
 
     const resumo = [
@@ -159,37 +169,51 @@ const PDFEngine = (() => {
 
     return {
       stack: [
-        { text: '', margin: [0, 20, 0, 0] },
+        { table: { widths: ['*'], body: [[{
+          stack: [
+            { text: 'OMNILICIT · LICITAETP', fontSize: 8, bold: true,
+              color: '#C2ECE7', alignment: 'center' },
+            { text: 'ESTUDO TÉCNICO PRELIMINAR · DOCUMENTO OFICIAL', fontSize: 9.5, bold: true,
+              color: COR.white, alignment: 'center', margin: [0, 4, 0, 0] },
+          ],
+          fillColor: COR.petroleo, margin: [0, 11, 0, 11],
+        }]]}, layout: 'noBorders', margin: [0, 0, 0, 22] },
+
         logo,
+
         { text: sanitizar((d.id.orgao || 'ÓRGÃO / ENTIDADE').toUpperCase()),
-          alignment: 'center', bold: true, fontSize: 13, color: COR.BRAND_DK,
-          characterSpacing: 0.5 },
+          alignment: 'center', bold: true, fontSize: 15, color: COR.executivo,
+          margin: [0, 0, 0, 4] },
         { text: sanitizar(d.id.unidade || ''), alignment: 'center', fontSize: 9,
-          color: COR.MUTED, margin: [0, 3, 0, 0] },
+          color: COR.muted },
         { text: d.id.uasg ? `UASG ${sanitizar(d.id.uasg)}` : '',
-          alignment: 'center', fontSize: 8, color: COR.MUTED, margin: [0, 2, 0, 0] },
-        { canvas: [{ type: 'line', x1: 150, y1: 0, x2: 365, y2: 0,
-                     lineWidth: 1.1, lineColor: COR.ACCENT }],
-          margin: [0, 14, 0, 18] },
-        { text: 'ESTUDO TÉCNICO PRELIMINAR', alignment: 'center', bold: true,
-          fontSize: 19, color: COR.BRAND_DK, characterSpacing: 1.2 },
-        { text: 'E T P', alignment: 'center', bold: true, fontSize: 11,
-          color: COR.ACCENT, characterSpacing: 6, margin: [0, 3, 0, 0] },
-        { text: 'Fundamentação: Lei nº 14.133/2021, art. 18, § 1º, incisos I a XI',
-          alignment: 'center', fontSize: 8.5, color: COR.MUTED, margin: [0, 9, 0, 0] },
-        { text: 'Documento integrante da fase preparatória da contratação',
-          alignment: 'center', fontSize: 8, italics: true, color: COR.MUTED,
-          margin: [0, 2, 0, 0] },
-        { text: '', margin: [0, 16, 0, 0] },
-        { table: { widths: [135, '*'], body: resumo.map(([k, v]) => [
-          { text: k.toUpperCase(), fontSize: 7.8, bold: true, color: COR.ACCENT,
-            fillColor: COR.BRAND_LT, margin: [8, 6, 8, 6] },
-          { text: String(v), fontSize: 9, color: COR.TEXT, margin: [8, 6, 8, 6] }
+          alignment: 'center', fontSize: 8, color: COR.muted, margin: [0, 2, 0, 0] },
+
+        { canvas: [{ type: 'line', x1: 60, y1: 0, x2: 455, y2: 0,
+                     lineWidth: 1.2, lineColor: COR.petroleo }], margin: [0, 22, 0, 16] },
+
+        { text: 'ESTUDO TÉCNICO PRELIMINAR',
+          alignment: 'center', bold: true, fontSize: 20, color: COR.ink,
+          characterSpacing: 1.2 },
+        { text: 'E T P',
+          alignment: 'center', bold: true, fontSize: 11, color: COR.executivo,
+          characterSpacing: 6, margin: [0, 4, 0, 0] },
+        { text: 'Lei nº 14.133/2021 · Art. 18, § 1º, incisos I a XI',
+          alignment: 'center', fontSize: 9.5, color: COR.petroleoD, margin: [0, 10, 0, 0] },
+
+        { canvas: [{ type: 'line', x1: 60, y1: 0, x2: 455, y2: 0,
+                     lineWidth: 1.2, lineColor: COR.petroleo }], margin: [0, 16, 0, 20] },
+
+        { table: { widths: [140, '*'], body: resumo.map(([k, v]) => [
+          { text: k.toUpperCase(), fontSize: 7.8, bold: true, color: COR.petroleoD,
+            fillColor: COR.petroleoLt, margin: [8, 6, 8, 6] },
+          { text: String(v), fontSize: 9, color: COR.ink, margin: [8, 6, 8, 6] }
         ])},
           layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5,
-                    hLineColor: () => COR.LINE, vLineColor: () => COR.LINE,
+                    hLineColor: () => COR.line, vLineColor: () => COR.line,
                     paddingLeft: () => 0, paddingRight: () => 0,
                     paddingTop: () => 0, paddingBottom: () => 0 } },
+
         { text: '', margin: [0, 18, 0, 0] },
         { text: `Documento emitido eletronicamente em ${new Date().toLocaleString('pt-BR')} · TAG ${meta.tag}`,
           alignment: 'center', fontSize: 7, color: '#94A3B8' }
@@ -198,6 +222,67 @@ const PDFEngine = (() => {
     };
   }
 
+  /* =====================================================================
+     NOTA DE APRESENTAÇÃO
+     ===================================================================== */
+  function blocoNota(d) {
+    const blocoNotaItem = (titulo, texto, bg) => ({
+      table: { widths: ['*'], body: [[{
+        stack: [
+          { text: titulo, fontSize: 9, bold: true, color: COR.petroleoD, margin: [0, 0, 0, 6] },
+          { text: texto, fontSize: 10, color: '#334155', lineHeight: 1.7, alignment: 'justify' },
+        ],
+        fillColor: bg, margin: [20, 16, 20, 16],
+      }]]},
+      layout: { hLineColor: () => COR.petroleo, vLineColor: () => COR.petroleo,
+                hLineWidth: () => 0.6, vLineWidth: () => 0.6,
+                paddingLeft: () => 0, paddingRight: () => 0,
+                paddingTop: () => 0, paddingBottom: () => 0 },
+      margin: [0, 0, 0, 16],
+    });
+
+    return { stack: [
+      { text: '', margin: [0, 20, 0, 0] },
+      { text: 'NOTA DE APRESENTAÇÃO INSTITUCIONAL',
+        alignment: 'center', bold: true, fontSize: 14, color: COR.executivo,
+        characterSpacing: 0.8, margin: [0, 0, 0, 6] },
+      { text: 'Termo de Abertura do Procedimento Administrativo',
+        alignment: 'center', fontSize: 9.5, color: COR.petroleoD, margin: [0, 0, 0, 12] },
+      { canvas: [{ type: 'line', x1: 60, y1: 0, x2: 455, y2: 0,
+                   lineWidth: 1.2, lineColor: COR.petroleo }], margin: [0, 0, 0, 20] },
+
+      blocoNotaItem('I. CONTEXTUALIZAÇÃO',
+        'O presente Estudo Técnico Preliminar (ETP) formaliza o início da fase preparatória ' +
+        'da contratação pública no âmbito deste órgão, em conformidade com a Lei nº 14.133/2021, ' +
+        'seu Art. 18, § 1º, e demais normas correlatas. O documento é instruído com a identificação ' +
+        'da necessidade, a devida motivação administrativa, a estimativa de valor e o enquadramento ' +
+        'legal aplicável, servindo de base para as etapas subsequentes de planejamento da contratação.',
+        COR.white),
+
+      blocoNotaItem('II. FINALIDADE E FUNDAMENTAÇÃO LEGAL',
+        'Este documento tem por finalidade subsidiar a elaboração do Termo de Referência ou ' +
+        'Projeto Básico, garantindo a motivação e o planejamento previstos no Art. 18 da Lei ' +
+        'nº 14.133/2021. A instrução processual observa ainda os princípios do Art. 5º — legalidade, ' +
+        'impessoalidade, moralidade, publicidade, eficiência, interesse público, motivação, segurança ' +
+        'jurídica, razoabilidade, competitividade e eficácia — bem como as diretrizes do Art. 11.',
+        COR.bg),
+
+      blocoNotaItem('III. AUTENTICIDADE E RASTREABILIDADE',
+        'Este documento foi gerado eletronicamente pelo sistema LicitaETP (OmniLicit), possui TAG ' +
+        'única rastreável pelo OmniLicit Audit e hash SHA-256 de integridade impresso no rodapé ' +
+        'de cada página. Sua validade jurídica está condicionada à conferência pela assessoria ' +
+        'jurídica, pelo controle interno e pela autoridade competente, conforme preconiza a ' +
+        'legislação vigente.',
+        COR.petroleoLt),
+
+      { text: `Processo administrativo nº ${sanitizar(d.id.processo) || '—'} · ETP nº ${sanitizar(d.id.numero) || '—'}/${sanitizar(d.id.exercicio) || '—'}`,
+        alignment: 'center', fontSize: 8.5, italics: true, color: COR.muted, margin: [0, 14, 0, 0] }
+    ], pageBreak: 'after' };
+  }
+
+  /* =====================================================================
+     PAINEL DE CONFORMIDADE
+     ===================================================================== */
   function blocoConformidade(d, conf, meta) {
     const linhas = conf.linhas.map(l => [
       { text: l.n, bold: true, alignment: 'center' },
@@ -208,43 +293,46 @@ const PDFEngine = (() => {
 
     return { stack: [
       { text: 'PAINEL DE CONFORMIDADE ETP', bold: true, fontSize: 12,
-        color: COR.BRAND_DK, characterSpacing: 0.8, margin: [0, 6, 0, 2] },
+        color: COR.petroleoD, alignment: 'center', characterSpacing: 0.8, margin: [0, 6, 0, 2] },
       { text: 'Estrutura de leitura automatizada — compatível com validação pelo OmniLicit Audit',
-        fontSize: 8.5, color: COR.MUTED, margin: [0, 0, 0, 12] },
+        fontSize: 8.5, color: COR.muted, alignment: 'center', margin: [0, 0, 0, 12] },
       { table: { headerRows: 1, widths: [38, '*', 72, 42], body: [
         [
-          { text: 'INCISO', bold: true, fontSize: 7.5, color: '#FFF',
-            fillColor: COR.BRAND, alignment: 'center', margin: [4, 6, 4, 6] },
+          { text: 'INCISO', bold: true, fontSize: 7.5, color: COR.white,
+            fillColor: COR.petroleo, alignment: 'center', margin: [4, 6, 4, 6] },
           { text: 'REQUISITO LEGAL — ART. 18, § 1º, LEI 14.133/2021', bold: true,
-            fontSize: 7.5, color: '#FFF', fillColor: COR.BRAND, margin: [4, 6, 4, 6] },
-          { text: 'STATUS', bold: true, fontSize: 7.5, color: '#FFF',
-            fillColor: COR.BRAND, alignment: 'center', margin: [4, 6, 4, 6] },
-          { text: 'SCORE', bold: true, fontSize: 7.5, color: '#FFF',
-            fillColor: COR.BRAND, alignment: 'center', margin: [4, 6, 4, 6] }
+            fontSize: 7.5, color: COR.white, fillColor: COR.petroleo, margin: [4, 6, 4, 6] },
+          { text: 'STATUS', bold: true, fontSize: 7.5, color: COR.white,
+            fillColor: COR.petroleo, alignment: 'center', margin: [4, 6, 4, 6] },
+          { text: 'SCORE', bold: true, fontSize: 7.5, color: COR.white,
+            fillColor: COR.petroleo, alignment: 'center', margin: [4, 6, 4, 6] }
         ], ...linhas
       ]},
         layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5,
-                  hLineColor: () => COR.LINE, vLineColor: () => COR.LINE,
+                  hLineColor: () => COR.line, vLineColor: () => COR.line,
                   paddingLeft: () => 5, paddingRight: () => 5,
                   paddingTop: () => 5, paddingBottom: () => 5 } },
       { text: '', margin: [0, 12, 0, 0] },
       { columns: [
         { width: '*', stack: [
           { text: 'SCORE GLOBAL DE CONFORMIDADE', fontSize: 7.5, bold: true,
-            color: COR.ACCENT, characterSpacing: 0.6, margin: [0, 0, 0, 5] },
+            color: COR.petroleoD, characterSpacing: 0.6, margin: [0, 0, 0, 5] },
           barra(conf.score),
           { text: `${conf.score}% de aderência aos incisos obrigatórios`,
-            fontSize: 8.5, color: COR.TEXT_SOFT, margin: [0, 6, 0, 0] }
+            fontSize: 8.5, color: '#334155', margin: [0, 6, 0, 0] }
         ]},
         { width: 130, stack: [
           { text: 'TAG DE AUTENTICAÇÃO', fontSize: 7.5, bold: true,
-            color: COR.ACCENT, characterSpacing: 0.6, margin: [0, 0, 0, 5] },
-          { text: meta.tag, fontSize: 8, bold: true, color: COR.BRAND_DK, alignment: 'right' }
+            color: COR.petroleoD, characterSpacing: 0.6, margin: [0, 0, 0, 5] },
+          { text: meta.tag, fontSize: 8, bold: true, color: COR.petroleoD, alignment: 'right' }
         ]}
       ]}
     ], pageBreak: 'after' };
   }
 
+  /* =====================================================================
+     CORPO (mantido)
+     ===================================================================== */
   function blocoCorpo(d) {
     return { stack: [
       secao('I', 'DESCRIÇÃO DA NECESSIDADE', [
@@ -295,12 +383,12 @@ const PDFEngine = (() => {
           [115, 195, 70, 40, 75], { wrapCols: [1] }),
         { table: { widths: ['*', 150], body: [[
           { text: 'VALOR TOTAL ESTIMADO DA CONTRATAÇÃO', bold: true, fontSize: 9,
-            color: COR.BRAND_DK, margin: [8, 8, 8, 8], fillColor: COR.BRAND_LT },
+            color: COR.petroleoD, margin: [8, 8, 8, 8], fillColor: COR.petroleoLt },
           { text: moeda(d.precos.total), bold: true, fontSize: 11,
-            color: '#15803D', alignment: 'right', margin: [8, 7, 8, 7],
-            fillColor: COR.BRAND_LT }
+            color: COR.ok, alignment: 'right', margin: [8, 7, 8, 7],
+            fillColor: COR.petroleoLt }
         ]]}, layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5,
-                        hLineColor: () => '#BBF7D0', vLineColor: () => '#BBF7D0',
+                        hLineColor: () => COR.petroleo, vLineColor: () => COR.petroleo,
                         paddingLeft: () => 0, paddingRight: () => 0,
                         paddingTop: () => 0, paddingBottom: () => 0 },
           margin: [0, 0, 0, 10] },
@@ -337,6 +425,9 @@ const PDFEngine = (() => {
     ]};
   }
 
+  /* =====================================================================
+     FOLHA DE APROVAÇÃO
+     ===================================================================== */
   function blocoAprovacao(d) {
     const lista = d.aprov.length ? d.aprov
       : [{ nome: d.id.responsavel || '—', cargo: d.id.cargo || '—',
@@ -348,14 +439,14 @@ const PDFEngine = (() => {
       const cells = par.map(a => ({
         stack: [
           { text: (sanitizar(a.papel) || 'AGENTE').toUpperCase(), fontSize: 7.5,
-            bold: true, color: COR.ACCENT, characterSpacing: 0.6, margin: [0, 0, 0, 26] },
+            bold: true, color: COR.petroleoD, characterSpacing: 0.6, margin: [0, 0, 0, 26] },
           { canvas: [{ type: 'line', x1: 0, y1: 0, x2: 215, y2: 0,
                        lineWidth: 0.8, lineColor: '#94A3B8' }] },
           { text: sanitizar(a.nome) || '—', bold: true, fontSize: 9,
-            color: '#0F172A', margin: [0, 5, 0, 0] },
-          { text: sanitizar(a.cargo) || '—', fontSize: 8, color: COR.TEXT_SOFT,
+            color: COR.ink, margin: [0, 5, 0, 0] },
+          { text: sanitizar(a.cargo) || '—', fontSize: 8, color: COR.muted,
             margin: [0, 1, 0, 0] },
-          { text: sanitizar(a.orgao) || '—', fontSize: 7.5, color: COR.MUTED,
+          { text: sanitizar(a.orgao) || '—', fontSize: 7.5, color: COR.muted,
             margin: [0, 1, 0, 0] },
           a.matricula ? { text: `Matrícula: ${sanitizar(a.matricula)}`, fontSize: 7,
                          color: '#94A3B8', margin: [0, 2, 0, 0] } : { text: '' },
@@ -371,130 +462,151 @@ const PDFEngine = (() => {
     const temGov = g.fiscalTitular || g.fiscalSubstituto || g.gestor;
     const blocoGov = temGov ? [{ stack: [
       { text: 'GOVERNANÇA CONTRATUAL', fontSize: 8, bold: true,
-        color: COR.ACCENT, characterSpacing: 0.8, margin: [0, 0, 0, 8] },
+        color: COR.petroleoD, characterSpacing: 0.8, margin: [0, 0, 0, 8] },
       { table: { widths: ['*','*','*'], body: [
         [
-          { text: 'FISCAL TITULAR', fontSize: 7, bold: true, color: COR.ACCENT,
-            fillColor: COR.BRAND_LT, alignment: 'center', margin: [6, 5, 6, 3] },
-          { text: 'FISCAL SUBSTITUTO', fontSize: 7, bold: true, color: COR.ACCENT,
-            fillColor: COR.BRAND_LT, alignment: 'center', margin: [6, 5, 6, 3] },
-          { text: 'GESTOR DO CONTRATO', fontSize: 7, bold: true, color: COR.ACCENT,
-            fillColor: COR.BRAND_LT, alignment: 'center', margin: [6, 5, 6, 3] }
+          { text: 'FISCAL TITULAR', fontSize: 7, bold: true, color: COR.petroleoD,
+            fillColor: COR.petroleoLt, alignment: 'center', margin: [6, 5, 6, 3] },
+          { text: 'FISCAL SUBSTITUTO', fontSize: 7, bold: true, color: COR.petroleoD,
+            fillColor: COR.petroleoLt, alignment: 'center', margin: [6, 5, 6, 3] },
+          { text: 'GESTOR DO CONTRATO', fontSize: 7, bold: true, color: COR.petroleoD,
+            fillColor: COR.petroleoLt, alignment: 'center', margin: [6, 5, 6, 3] }
         ],
         [
-          { text: sanitizar(g.fiscalTitular) || '—', fontSize: 8.5, color: COR.TEXT,
+          { text: sanitizar(g.fiscalTitular) || '—', fontSize: 8.5, color: COR.ink,
             alignment: 'center', margin: [6, 4, 6, 6] },
-          { text: sanitizar(g.fiscalSubstituto) || '—', fontSize: 8.5, color: COR.TEXT,
+          { text: sanitizar(g.fiscalSubstituto) || '—', fontSize: 8.5, color: COR.ink,
             alignment: 'center', margin: [6, 4, 6, 6] },
-          { text: sanitizar(g.gestor) || '—', fontSize: 8.5, color: COR.TEXT,
+          { text: sanitizar(g.gestor) || '—', fontSize: 8.5, color: COR.ink,
             alignment: 'center', margin: [6, 4, 6, 6] }
         ]
       ]},
         layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5,
-                  hLineColor: () => COR.LINE, vLineColor: () => COR.LINE,
+                  hLineColor: () => COR.line, vLineColor: () => COR.line,
                   paddingLeft: () => 0, paddingRight: () => 0,
                   paddingTop: () => 0, paddingBottom: () => 0 },
         margin: [0, 0, 0, 14] }
     ]}] : [];
 
     return { stack: [
-      { text: 'FOLHA DE APROVAÇÃO E VALIDAÇÃO', bold: true, fontSize: 12,
-        color: COR.BRAND_DK, characterSpacing: 0.8, margin: [0, 6, 0, 2] },
+      { text: 'FOLHA DE APROVAÇÃO E VALIDAÇÃO', bold: true, fontSize: 14,
+        color: COR.executivo, alignment: 'center', characterSpacing: 0.8, margin: [0, 6, 0, 2] },
       { text: 'Documento sujeito a manifestação dos agentes abaixo identificados',
-        fontSize: 8.5, color: COR.MUTED, margin: [0, 0, 0, 16] },
+        fontSize: 8.5, color: COR.muted, alignment: 'center', margin: [0, 0, 0, 16] },
       ...blocoGov,
       { table: { widths: ['*','*'], body: rows }, layout: 'noBorders',
         dontBreakRows: true, margin: [0, 0, 0, 10] },
       { text: '', margin: [0, 10, 0, 0] },
       { table: { widths: ['*'], body: [[{ stack: [
         { text: 'DECLARAÇÃO DE CIÊNCIA', fontSize: 7.5, bold: true,
-          color: COR.ACCENT, characterSpacing: 0.6, margin: [0, 0, 0, 5] },
+          color: COR.petroleoD, characterSpacing: 0.6, margin: [0, 0, 0, 5] },
         { text: 'Os agentes signatários declaram ter analisado o presente Estudo Técnico Preliminar e manifestam-se de acordo com o conteúdo técnico, a estimativa de quantidades, a estimativa de preços e o posicionamento conclusivo quanto à viabilidade da contratação, nos termos do art. 18 da Lei nº 14.133/2021.',
-          fontSize: 8.5, alignment: 'justify', lineHeight: 1.4,
-          color: COR.TEXT_SOFT }
+          fontSize: 8.5, alignment: 'justify', lineHeight: 1.4, color: '#334155' }
       ], margin: [12, 11, 12, 11] }]]},
         layout: { hLineWidth: () => 0.5, vLineWidth: () => 0.5,
-                  hLineColor: () => COR.LINE, vLineColor: () => COR.LINE,
+                  hLineColor: () => COR.line, vLineColor: () => COR.line,
                   paddingLeft: () => 0, paddingRight: () => 0,
                   paddingTop: () => 0, paddingBottom: () => 0 } },
-      { text: `${sanitizar(d.id.unidade) || ''}${d.id.unidade && d.id.orgao ? ' — ' : ''}${sanitizar(d.id.orgao) || ''}, ${dataBR(d.id.data)}.`,
-        alignment: 'right', fontSize: 9, color: COR.TEXT_SOFT, margin: [0, 22, 0, 0] }
+      { text: `${sanitizar(d.id.unidade) || ''}${d.id.unidade && d.id.orgao ? ' — ' : ''}${sanitizar(d.id.orgao) || ''}, ${formatarDataHora(d.id.data).split(' ')[0]}.`,
+        alignment: 'right', fontSize: 9, color: COR.muted, margin: [0, 22, 0, 0] }
     ], pageBreak: 'before' };
+  }
+
+  /* =====================================================================
+     ✅ NOVA PÁGINA DE AUTENTICAÇÃO — Réplica do LicitaReq
+     ===================================================================== */
+  function linhaMeta(chave, valor) {
+    return [
+      { text: chave + ':', fontSize: 8, bold: true, color: '#334155',
+        fillColor: '#F1F5F9', margin: [8, 5, 8, 5] },
+      { text: valor || '—', fontSize: 8, color: COR.ink,
+        font: /^[A-F0-9]{64}$/.test(valor || '') ? 'Courier' : undefined,
+        margin: [8, 5, 8, 5] },
+    ];
+  }
+
+  function layoutMeta() {
+    return {
+      hLineColor: () => '#CBD5E1', vLineColor: () => '#CBD5E1',
+      hLineWidth: () => 0.4, vLineWidth: () => 0.4,
+      paddingLeft: () => 0, paddingRight: () => 0,
+      paddingTop: () => 0, paddingBottom: () => 0,
+    };
   }
 
   function blocoAutenticacao(d, meta) {
-    const caixaLayout = { hLineWidth: () => 1.2, vLineWidth: () => 1.2,
-                          hLineColor: () => COR.BRAND, vLineColor: () => COR.BRAND,
-                          paddingLeft: () => 0, paddingRight: () => 0,
-                          paddingTop: () => 0, paddingBottom: () => 0 };
+    return {
+      pageBreak: 'before',
+      stack: [{
+        unbreakable: true,
+        stack: [
+          { text: '', margin: [0, 4, 0, 0] },
+          { text: '[SEG]', fontSize: 14, bold: true, alignment: 'center',
+            color: COR.petroleoD, letterSpacing: 2, margin: [0, 0, 0, 10] },
+          { text: 'AUTENTICAÇÃO E RASTREABILIDADE', fontSize: 14, bold: true,
+            alignment: 'center', color: COR.petroleoD, margin: [0, 0, 0, 3] },
+          { text: 'Documento Oficial OmniLicit · Integração LicitaAudit',
+            fontSize: 8.5, alignment: 'center', color: COR.muted, margin: [0, 0, 0, 14] },
 
-    return { stack: [
-      { text: '', margin: [0, 40, 0, 0] },
-      { text: 'AUTENTICAÇÃO E RASTREABILIDADE', alignment: 'center', bold: true,
-        fontSize: 13, color: COR.BRAND_DK, characterSpacing: 1 },
-      { text: `Documento eletrônico gerado pelo sistema ${VERSAO_MODULO}`,
-        alignment: 'center', fontSize: 8.5, color: COR.MUTED, margin: [0, 4, 0, 22] },
-      { table: { widths: ['*'], body: [[{ stack: [
-        { text: 'SELO DIGITAL DO ESTUDO TÉCNICO PRELIMINAR', alignment: 'center',
-          fontSize: 7.5, bold: true, color: COR.ACCENT, characterSpacing: 1,
-          margin: [0, 0, 0, 12] },
-        { text: meta.tag, alignment: 'center', fontSize: 14, bold: true,
-          color: COR.BRAND_DK, characterSpacing: 1.4, margin: [0, 0, 0, 10] },
-        { canvas: [{ type: 'line', x1: 40, y1: 0, x2: 395, y2: 0,
-                     lineWidth: 0.6, lineColor: COR.LINE }], margin: [0, 4, 0, 14] },
-        { text: 'HASH DE INTEGRIDADE — SHA-256', alignment: 'center', fontSize: 7,
-          bold: true, color: COR.ACCENT, characterSpacing: 0.8, margin: [0, 0, 0, 5] },
-        { text: meta.hash, alignment: 'center', fontSize: 7.2, color: COR.TEXT_SOFT,
-          characterSpacing: 0.4, lineHeight: 1.35, margin: [0, 0, 0, 14] },
-        { table: { widths: ['*','*'], body: [
-          [{ text: 'EMITIDO EM', fontSize: 6.8, bold: true, color: COR.MUTED,
-             alignment: 'center', margin: [0, 4, 0, 2] },
-           { text: 'EXERCÍCIO', fontSize: 6.8, bold: true, color: COR.MUTED,
-             alignment: 'center', margin: [0, 4, 0, 2] }],
-          [{ text: meta.emitidoEm, fontSize: 8.5, bold: true, color: '#0F172A',
-             alignment: 'center', margin: [0, 2, 0, 6] },
-           { text: sanitizar(d.id.exercicio) || '—', fontSize: 8.5, bold: true,
-             color: '#0F172A', alignment: 'center', margin: [0, 2, 0, 6] }],
-          [{ text: 'Nº DO ETP', fontSize: 6.8, bold: true, color: COR.MUTED,
-             alignment: 'center', margin: [0, 4, 0, 2] },
-           { text: 'PROCESSO', fontSize: 6.8, bold: true, color: COR.MUTED,
-             alignment: 'center', margin: [0, 4, 0, 2] }],
-          [{ text: `${sanitizar(d.id.numero) || '—'}/${sanitizar(d.id.exercicio) || '—'}`,
-             fontSize: 8.5, bold: true, color: '#0F172A', alignment: 'center',
-             margin: [0, 2, 0, 6] },
-           { text: sanitizar(d.id.processo) || '—', fontSize: 8.5, bold: true,
-             color: '#0F172A', alignment: 'center', margin: [0, 2, 0, 6] }]
-        ]}, layout: { hLineWidth: () => 0.4, vLineWidth: () => 0.4,
-                      hLineColor: () => '#E2E8F0', vLineColor: () => '#E2E8F0',
-                      paddingLeft: () => 0, paddingRight: () => 0,
-                      paddingTop: () => 0, paddingBottom: () => 0 } }
-      ], margin: [22, 20, 22, 20] }]]}, layout: caixaLayout },
-      { text: '', margin: [0, 16, 0, 0] },
-      { table: { widths: ['*'], body: [[{ stack: [
-        { text: 'AVISO DE AUDITORIA E INTEGRAÇÃO', fontSize: 7.5, bold: true,
-          color: '#92400E', characterSpacing: 0.6, margin: [0, 0, 0, 5] },
-        { text: `Este documento é auditável eletronicamente pelo módulo ${SISTEMA_AUDIT}. A autenticidade pode ser verificada pela conferência da TAG exclusiva e do hash SHA-256 junto ao repositório institucional. Qualquer alteração posterior de conteúdo invalida o hash registrado, caracterizando adulteração documental.`,
-          fontSize: 8, alignment: 'justify', lineHeight: 1.4,
-          color: '#78350F', margin: [0, 0, 0, 6] },
-        { text: 'A ausência de assinatura física não prejudica a validade do ato, nos termos do art. 4º, incisos I e II, e do art. 5º da Lei nº 14.133/2021, e da MP nº 2.200-2/2001.',
-          fontSize: 7.5, italics: true, color: '#92400E' }
-      ], margin: [12, 11, 12, 11] }]]},
-        layout: { hLineWidth: () => 1, vLineWidth: () => 1,
-                  hLineColor: () => '#FCD34D', vLineColor: () => '#FCD34D',
-                  paddingLeft: () => 0, paddingRight: () => 0,
-                  paddingTop: () => 0, paddingBottom: () => 0 },
-        fillColor: '#FFFBEB' },
-      { text: '', margin: [0, 26, 0, 0] },
-      { canvas: [{ type: 'line', x1: 100, y1: 0, x2: 415, y2: 0,
-                   lineWidth: 0.5, lineColor: COR.LINE }] },
-      { text: `${VERSAO_MODULO} · Padrão de auditoria ${SISTEMA_AUDIT}`,
-        alignment: 'center', fontSize: 7, color: '#94A3B8', margin: [0, 8, 0, 0] },
-      { text: '— FIM DO DOCUMENTO —', alignment: 'center', fontSize: 7, bold: true,
-        color: '#94A3B8', characterSpacing: 1, margin: [0, 4, 0, 0] }
-    ], pageBreak: 'before' };
+          /* TAG box — fundo petróleo */
+          { table: { widths: ['*'], body: [[{
+            stack: [
+              { text: 'TAG DE AUTENTICAÇÃO', fontSize: 8, bold: true,
+                alignment: 'center', color: '#C2ECE7', margin: [0, 0, 0, 3] },
+              { text: meta.tag, fontSize: 12, bold: true, alignment: 'center', color: COR.white },
+            ],
+            fillColor: COR.petroleo, margin: [16, 12, 16, 12],
+          }]]}, layout: 'noBorders', margin: [0, 0, 0, 12] },
+
+          /* Meta table */
+          { table: {
+            widths: ['35%', '*'],
+            body: [
+              linhaMeta('Hash SHA-256', meta.hash),
+              linhaMeta('Emitido em',        meta.emitidoEm),
+              linhaMeta('Sistema Emissor',   VERSAO_MODULO),
+              linhaMeta('Órgão Emissor',     d.id.orgao || '—'),
+              linhaMeta('Expediente',        `ETP ${sanitizar(d.id.numero) || '—'}/${sanitizar(d.id.exercicio) || '—'}`),
+              linhaMeta('Processo',          sanitizar(d.id.processo) || '—'),
+              linhaMeta('Score de Conformidade', `${meta.confScore != null ? meta.confScore : '—'}/100`),
+              linhaMeta('Tag de Integração', 'PREFIRO_TAG: OmniLicit_ETP_Oficial'),
+            ],
+          }, layout: layoutMeta(), margin: [0, 0, 0, 12] },
+
+          /* Aviso amarelo */
+          { table: { widths: ['*'], body: [[{
+            stack: [
+              { text: '[!]  AVISO IMPORTANTE', fontSize: 8.5, bold: true,
+                color: COR.avisoBold, margin: [0, 0, 0, 4] },
+              { text: 'Este documento foi gerado automaticamente pelo sistema LicitaETP (OmniLicit) ' +
+                      'e possui TAG de autenticação única rastreável pelo OmniLicit Audit. A validade ' +
+                      'jurídica do presente ETP está condicionada à conferência pela assessoria jurídica, ' +
+                      'pelo controle interno e pela autoridade competente.',
+                fontSize: 8, color: COR.avisoTx, lineHeight: 1.4, alignment: 'justify' },
+            ],
+            fillColor: COR.avisoBg, margin: [14, 10, 14, 10],
+          }]]}, layout: 'noBorders', margin: [0, 0, 0, 12] },
+
+          /* Selo digital */
+          { table: { widths: ['*'], body: [[{
+            stack: [
+              { text: '•  SELO DIGITAL OMNILICIT', fontSize: 8, bold: true,
+                alignment: 'center', color: COR.petroleoD, margin: [0, 0, 0, 3] },
+              { text: 'Documento íntegro · Não adulterado · Rastreável', fontSize: 7,
+                alignment: 'center', color: COR.muted, margin: [0, 3, 0, 0] },
+              { text: meta.tag, fontSize: 7, alignment: 'center',
+                color: COR.muted, font: 'Courier', margin: [0, 4, 0, 0] },
+            ],
+            fillColor: COR.petroleoLt, margin: [14, 10, 14, 10],
+          }]]}, layout: 'noBorders' },
+        ],
+      }],
+    };
   }
 
-  /* ---------- 3.4 Montagem e disparo ---------- */
+  /* =====================================================================
+     MONTAGEM + GERAR
+     ===================================================================== */
   function montar(d, conf, meta, logoDataUrl) {
     return {
       pageSize: 'A4',
@@ -525,33 +637,31 @@ const PDFEngine = (() => {
       },
       content: [
         blocoCapa(d, conf, meta, logoDataUrl),
+        blocoNota(d),
         blocoConformidade(d, conf, meta),
         blocoCorpo(d),
         blocoAprovacao(d),
-        blocoAutenticacao(d, meta)
+        blocoAutenticacao(d, meta)     // ✅ nova página
       ],
-      defaultStyle: { font: 'Roboto', fontSize: 9.5, color: COR.TEXT }
+      defaultStyle: { font: 'Roboto', fontSize: 9.5, color: COR.ink }
     };
   }
 
-  /**
-   * Gera e baixa o PDF.
-   * @param {object} dados — payload de `coletarDados()` do app.js
-   * @param {object} conf  — { score, linhas }
-   * @param {object} opts  — { exercicio, arquivoNome, logoDataUrl }
-   */
   async function gerar(dados, conf, opts = {}) {
     const logoDataUrl = opts.logoDataUrl || OmniLogo.get() || null;
     const exercicio = opts.exercicio || dados.id.exercicio || String(new Date().getFullYear());
     const ano = (exercicio.match(/\d{4}/) || [String(new Date().getFullYear())])[0];
 
-    /* Selo OMNILICIT::ETP::[TAG_UNICA]::[ANO] */
+    /* Selo OMNILICIT::ETP::[TAG]::[ANO] */
     const tag = `OMNILICIT::ETP::${gerarCodigoTag()}::${ano}`;
     const emitidoEm = new Date().toLocaleString('pt-BR');
     const hash = await sha256Hex(JSON.stringify({
       etp: dados, conformidade: conf.score, tag, emitidoEm, modulo: VERSAO_MODULO
     }));
-    const meta = { tag, hash, emitidoEm, exercicio: ano, modulo: VERSAO_MODULO };
+    const meta = {
+      tag, hash, emitidoEm, exercicio: ano, modulo: VERSAO_MODULO,
+      confScore: conf.score
+    };
 
     const doc = montar(dados, conf, meta, logoDataUrl);
     const arquivo = opts.arquivoNome || `ETP_${dados.id.numero || '001'}_${ano}.pdf`;
