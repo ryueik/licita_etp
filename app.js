@@ -57,7 +57,7 @@ async function injetarIdentidadeVisual() {
   /* 1. Logo no header */
   const brand = document.getElementById('brandLogo');
   if (brand) {
-    const src = logoDataUrl || 'OmniLicit.png';
+    const src = logoDataUrl || 'logo-omnlicit.png';
     brand.innerHTML = `<img src="${src}" alt="OmniLicit"
                             style="width:100%;height:100%;object-fit:contain;border-radius:10px"
                             onerror="this.style.display='none'" />`;
@@ -66,7 +66,7 @@ async function injetarIdentidadeVisual() {
   /* 2. Logo no modal welcome */
   const w = document.getElementById('welcomeLogo');
   if (w) {
-    const src = logoDataUrl || 'OmniLicit.png';
+    const src = logoDataUrl || 'logo-omnlicit.png';
     w.innerHTML = `<img src="${src}" alt="OmniLicit"
                         style="width:100%;height:100%;object-fit:contain;border-radius:16px"
                         onerror="this.style.display='none'" />`;
@@ -76,7 +76,7 @@ async function injetarIdentidadeVisual() {
   const favicon = document.getElementById('favicon');
   if (favicon) {
     favicon.type = 'image/png';
-    favicon.href = logoDataUrl || 'OmniLicit.png';
+    favicon.href = logoDataUrl || 'logo-omnlicit.png';
   }
 
   /* 4. Preload da logo (performance) */
