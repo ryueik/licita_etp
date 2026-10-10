@@ -1,10 +1,10 @@
 /* =====================================================================
-   OMNILICIT · LicitaETP · DFD Parser Universal v6.3
+   OMNILICIT · LicitaETP · DFD Parser Universal v6.4
    ---------------------------------------------------------------------
-   ✅ v6.3: regex prioritária para Objeto da Contratação
-   ✅ Lista expandida de sinônimos (12 variações)
-   ✅ validaObjeto ajustado para aceitar mais casos
-   ✅ Regex prioritária para Nº DFD, PCA Item e Data (herdado v6.2)
+   ✅ v6.4: STOPS plural-aware (Quantidades, Itens, etc.)
+   ✅ Post-processing isolarObjeto() — belt-and-suspenders
+   ✅ Corte inline de quantidades ("30 workstations e 20 notebooks")
+   ✅ Regex prioritária: Nº DFD, PCA Item, Data, Objeto
    ===================================================================== */
 'use strict';
 
@@ -45,7 +45,8 @@ const DFDParser = (() => {
     'fiscal','fiscal titular','fiscal substituto','gestor','gestor do contrato',
     'gestor contratual','pca','alinhamento ao pca','quantitativo','quantidade',
     'emitido em','gerado em','documento gerado','pagina','page',
-    'assinatura','carimbo','data de emissao','hash','tag','sha 256'
+    'assinatura','carimbo','data de emissao','hash','tag','sha 256',
+    'estimativa de quantidade','estimativa de quantidades','memoria de calculo'
   ]);
 
   /* =====================================================================
@@ -183,25 +184,15 @@ const DFDParser = (() => {
     return false;
   };
 
-  /* ✅ v6.3: validaObjeto menos restritivo */
   const validaObjeto = v => {
-    if (!v || v.length < 8) return false;                // aceita >= 8 chars
+    if (!v || v.length < 8) return false;
     if (ehRuido(v)) return false;
-    if (/^\s*[\d\/\-\.:\s]+\s*$/.test(v)) return false;  // só números
+    if (/^\s*[\d\/\-\.:\s]+\s*$/.test(v)) return false;
     if (/\b(emitido|gerado|p[áa]gina|page|sha-?256|omnilicit)\b/i.test(v)) return false;
-
-    // ✅ Rejeita se for APENAS um label conhecido
     if (ehLabel(v)) return false;
-
-    // ✅ Rejeita se for apenas "DFD 042/2026" ou similar
     if (/^\s*(DFD|ETP)\s*\d/i.test(v) && v.length < 20) return false;
-
-    // ✅ Rejeita se for apenas data
     if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}$/.test(v)) return false;
-
-    // ✅ Rejeita se for apenas um nome de pessoa (heurística)
     if (/^[A-ZÀ-Ú][a-zà-ú]+(\s+[A-ZÀ-Ú][a-zà-ú]+){1,3}$/.test(v) && v.length < 40) return false;
-
     return true;
   };
 
@@ -221,6 +212,136 @@ const DFDParser = (() => {
     if (palavrasLongas >= 2) return false;
     return true;
   };
+
+  /* =====================================================================
+     ✅ v6.4: ISOLAR OBJETO — post-processing
+     ---------------------------------------------------------------------
+     Corta o objeto em qualquer ponto onde começar:
+     1. Um label de outro campo (Quantidade, Valor, Prazo, ...)
+     2. Uma linha iniciada por número + palavra (ex.: "30 workstations")
+     3. Um trecho de quantidade inline ("30 (trinta) workstations")
+     ===================================================================== */
+  function isolarObjeto(textoBruto) {
+    if (!textoBruto) return '';
+    let t = String(textoBruto).trim();
+
+    /* --- CORTE 1: Labels que indicam OUTRO campo (plural-aware) --- */
+    const CORTES_LABEL = [
+      /* Quantidade / Quantitativo — PLURAL E SINGULAR */
+      /\bEstimativas?\s+de\s+Quantidades?\b/i,
+      /\bEstimativas?\s+de\s+Quantidades?\s+Estimadas?\b/i,
+      /\bQuantitativos?\s+Estimados?\b/i,
+      /\bQuantitativos?\b/i,
+      /\bQuantidades?\s+Estimadas?\b/i,
+      /\bQuantidades?\b/i,
+      /\bEspecifica[çc][ãa]o\s+de\s+Quantidades?\b/i,
+      /\bMem[óo]ria\s+de\s+C[áa]lculo\b/i,
+      /\bItens?\s+da\s+Contrata[çc][ãa]o\b/i,
+      /\bListas?\s+de\s+Itens\b/i,
+      /\bRela[çc][ãa]o\s+de\s+Itens\b/i,
+      /\bN[º°]?\s+de\s+Itens\b/i,
+
+      /* Valor */
+      /\bValor\s+(?:Total\s+)?Estimados?\b/i,
+      /\bValor\s+Estimados?\b/i,
+      /\bValor\s+Global\b/i,
+      /\bValor\s+Total\b/i,
+      /\bValores?\b/i,
+
+      /* Justificativa / Motivação / Fundamentação */
+      /\bJustificativas?\s+(?:da\s+)?(?:Necessidades?|Demandas?|Contrata[çc][ãa]o)\b/i,
+      /\bJustificativas?\b/i,
+      /\bFundamenta[çc][ãa]o\b/i,
+      /\bMotiva[çc][ãa]o\b/i,
+      /\bRaz[ãa]o\s+da\s+Necessidades?\b/i,
+
+      /* Enquadramento */
+      /\bModalidades?\s+(?:Pretendidas?|de\s+Licita[çc][ãa]o)\b/i,
+      /\bModalidades?\b/i,
+      /\bCrit[ée]rios?\s+de\s+Julgamentos?\b/i,
+      /\bNaturezas?\s+do\s+Objeto\b/i,
+      /\bEnquadramentos?\b/i,
+
+      /* Prazos e local */
+      /\bPrazos?\s+de\s+Execu[çc][ãa]o\b/i,
+      /\bPrazos?\s+de\s+Entregas?\b/i,
+      /\bPrazos?\s+Contratuais?\b/i,
+      /\bPrazos?\b/i,
+      /\bLocais?\s+de\s+Entregas?\b/i,
+      /\bLocais?\s+da\s+Presta[çc][ãa]o\b/i,
+      /\bLocais?\b/i,
+
+      /* Condições de pagamento */
+      /\bCondi[çc][õo]es\s+de\s+Pagamentos?\b/i,
+      /\bFormas?\s+de\s+Pagamentos?\b/i,
+
+      /* Identificação */
+      /\bData\s+de\s+Elabora[çc][ãa]o\b/i,
+      /\bData\s+da\s+Formaliza[çc][ãa]o\b/i,
+      /\bProcessos?\s+Administrativos?\b/i,
+      /\bProcessos?\b/i,
+      /\bRespons[áa]veis?\s+(?:pela|da)\b/i,
+      /\bFiscais?\s+(?:Titulares?|Substitutos?|do\s+Contratos?)?\b/i,
+      /\bGestores?\s+(?:do\s+Contratos?)?\b/i,
+
+      /* Orçamento */
+      /\bDota[çc][õo]es?\s+Or[çc]ament[áa]rias?\b/i,
+      /\bFontes?\s+de\s+Recursos?\b/i,
+
+      /* PCA */
+      /\bItens?\s+do\s+PCA\b/i,
+      /\bC[óo]digos?\s+do\s+PCA\b/i,
+      /\bAlinhamentos?\s+ao\s+PCA\b/i,
+      /\bPCA\b/,
+
+      /* Blocos finais */
+      /\bBenef[íi]cios\b/i,
+      /\bResultados?\s+Pretendidos?\b/i,
+      /\bProvid[êe]ncias?\b/i,
+    ];
+
+    let menorIdx = t.length;
+    for (const rx of CORTES_LABEL) {
+      const m = t.match(rx);
+      if (m && m.index < menorIdx) menorIdx = m.index;
+    }
+    t = t.slice(0, menorIdx).trim();
+
+    /* --- CORTE 2: Linha começando com número + palavra (quantidade) --- */
+    const linhas = t.split(/\n/).map(l => l.trim()).filter(Boolean);
+    while (linhas.length > 1) {
+      const ultima = linhas[linhas.length - 1];
+
+      // "30 (trinta) workstations e 20 (vinte) notebooks"
+      if (/^\d+\s*(?:\([^)]+\))?\s+[A-Za-zÀ-Ú]/i.test(ultima)) {
+        linhas.pop();
+        continue;
+      }
+      // "30 unidades", "20 pçs", "5 kits", "10 caixas"
+      if (/^\d+\s*(?:un|und|unidade|unidades|caixa|caixas|pe[çc]a|pe[çc]as|kit|kits|p[çc]s|pacote|pacotes|conjunto|conjuntos|par|pares)\b/i.test(ultima)) {
+        linhas.pop();
+        continue;
+      }
+      break;
+    }
+    t = linhas.join('\n').trim();
+
+    /* --- CORTE 3: Quantidade inline ("30 (trinta) workstations") --- */
+    const rxQtdInline = /\s+\d+\s*(?:\([^)]+\))?\s*(?:workstations?|notebooks?|computadores?|servidores?|cadeiras?|mesas?|monitores?|impressoras?|scanners?|esta[çc][õo]es|unidades?|unid\b|p[çc]s\b|kits?\b|caixas?\b|pe[çc]as?\b|licen[çc]as?\b|assinaturas?\b)/i;
+    const m = t.match(rxQtdInline);
+    if (m && m.index > 20) {
+      t = t.slice(0, m.index).trim();
+    }
+
+    /* --- CORTE 4: Remover fragmentos residuais no fim --- */
+    t = t.replace(/[\s,;:\-–—.]+$/, '').trim();
+
+    /* --- CORTE 5: Parágrafo iniciando com "Quantidade:" ou "Qtd:" --- */
+    t = t.replace(/\bQuantidade[s]?\s*:\s*[\s\S]*$/i, '').trim();
+    t = t.replace(/\bQtd\.?\s*:\s*[\s\S]*$/i, '').trim();
+
+    return t;
+  }
 
   /* =====================================================================
      6. PARSER DE JSON
@@ -385,12 +506,8 @@ const DFDParser = (() => {
   }
 
   /* =====================================================================
-     ✅ v6.3: EXTRATORES POR REGEX
+     EXTRATORES POR REGEX
      ===================================================================== */
-
-  /**
-   * Nº do DFD
-   */
   function extrairNumeroDFDDoTexto(texto) {
     if (!texto) return '';
     const padroes = [
@@ -412,9 +529,6 @@ const DFDParser = (() => {
     return '';
   }
 
-  /**
-   * Item do PCA
-   */
   function extrairPcaItemDoTexto(texto) {
     if (!texto) return '';
     const padroes = [
@@ -445,14 +559,12 @@ const DFDParser = (() => {
   }
 
   /**
-   * ✅ v6.3: OBJETO DA CONTRATAÇÃO — regex prioritária
-   * Captura o texto após qualquer um dos labels sinônimos,
-   * até encontrar um marcador de parada (outro label, ponto final, etc.)
+   * ✅ v6.4: extrai objeto + aplica isolarObjeto() como pós-corte
    */
   function extrairObjetoDoTexto(texto) {
     if (!texto) return '';
 
-    /* Labels sinônimos — ordem: mais específico → mais genérico */
+    /* Labels sinônimos */
     const LABELS = [
       'Descri[çc][ãa]o\\s+Resumida\\s+do\\s+Objeto',
       'Objeto\\s+da\\s+Contrata[çc][ãa]o',
@@ -465,77 +577,79 @@ const DFDParser = (() => {
       'Objeto',
     ];
 
-    /* Marcadores de parada — onde o objeto termina */
+    /* Stops PLURAL-AWARE — depois do label, para onde parar */
     const STOPS = [
-      'Justificativa\\s+da\\s+Necessidade',
-      'Justificativa\\s+da\\s+Demanda',
-      'Justificativa\\s+da\\s+Contrata[çc][ãa]o',
-      'Justificativa',
+      'Estimativas?\\s+de\\s+Quantidades?(?:\\s+Estimadas?)?',
+      'Quantitativos?(?:\\s+Estimados?)?',
+      'Quantidades?(?:\\s+Estimadas?)?',
+      'Especifica[çc][ãa]o\\s+de\\s+Quantidades?',
+      'Mem[óo]ria\\s+de\\s+C[áa]lculo',
+      'Itens?\\s+da\\s+Contrata[çc][ãa]o',
+      'Listas?\\s+de\\s+Itens',
+      'Rela[çc][ãa]o\\s+de\\s+Itens',
+      'N[º°]?\\s+de\\s+Itens',
+      'Justificativas?(?:\\s+(?:da\\s+)?(?:Necessidades?|Demandas?|Contrata[çc][ãa]o))?',
       'Fundamenta[çc][ãa]o',
       'Motiva[çc][ãa]o',
-      'Estimativa\\s+de\\s+Quantidade',
-      'Quantitativo',
-      'Quantidade',
-      'Valor\\s+(?:Total\\s+)?Estimado',
-      'Valor\\s+Estimado',
-      'Valor\\s+Global',
-      'Valor',
-      'Modalidade',
-      'Crit[ée]rio\\s+de\\s+Julgamento',
-      'Natureza\\s+do\\s+Objeto',
-      'Prazo\\s+de\\s+Execu[çc][ãa]o',
-      'Prazo',
-      'Local\\s+de\\s+Entrega',
-      'Local',
-      'Data\\s+de\\s+Elabora[çc][ãa]o',
-      'Data',
-      'Processo\\s+Administrativo',
-      'Processo',
-      'Respons[áa]vel',
-      'Fiscal',
-      'Gestor',
-      'Dotação',
-      'Fonte\\s+de\\s+Recurso',
-      'Fonte',
+      'Raz[ãa]o\\s+da\\s+Necessidades?',
+      'Valor(?:es)?\\s+(?:Total\\s+)?Estimados?',
+      'Valores?',
+      'Modalidades?(?:\\s+(?:Pretendidas?|de\\s+Licita[çc][ãa]o))?',
+      'Crit[ée]rios?\\s+de\\s+Julgamentos?',
+      'Naturezas?\\s+do\\s+Objeto',
+      'Prazos?(?:\\s+(?:de\\s+(?:Execu[çc][ãa]o|Entregas?)|Contratuais?))?',
+      'Locais?(?:\\s+(?:de\\s+Entregas?|da\\s+Presta[çc][ãa]o))?',
+      'Condi[çc][õo]es\\s+de\\s+Pagamentos?',
+      'Formas?\\s+de\\s+Pagamentos?',
+      'Data\\s+(?:de\\s+Elabora[çc][ãa]o|da\\s+Formaliza[çc][ãa]o)',
+      'Processos?(?:\\s+Administrativos?)?',
+      'Respons[áa]veis?',
+      'Fiscais?',
+      'Gestores?',
+      'Dota[çc][õo]es?(?:\\s+Or[çc]ament[áa]rias?)?',
+      'Fontes?\\s+de\\s+Recursos?',
+      'Itens?\\s+do\\s+PCA',
+      'Alinhamentos?(?:\\s+ao\\s+PCA)?',
       'PCA',
-      'Item\\s+do\\s+PCA',
-      'Alinhamento',
+      'Enquadramentos?',
+      'Benef[íi]cios',
+      'Resultados?\\s+Pretendidos?',
+      'Provid[êe]ncias?',
     ];
 
-    /* Regex: label → captura até stop ou limite */
     const LABEL_RX = '(?:' + LABELS.join('|') + ')';
-    const STOP_RX  = '(?:' + STOPS.join('|') + ')';
+    const STOP_RX  = '(?:' + STOPS.join('|') + ')(?=\\s|[:\\-–—]|$|\\n)';
 
-    /* Padrão 1: label + valor na MESMA LINHA (até stop ou 300 chars) */
+    /* Padrão 1: label + valor na mesma linha */
     const rxMesmaLinha = new RegExp(
-      LABEL_RX + '\\s*[:\\-–—]?\\s*([^\\n]{8,300}?)(?=\\s*(?:' + STOP_RX + ')\\b|\\n|$)',
+      LABEL_RX + '\\s*[:\\-–—]?\\s*([^\\n]{8,300}?)(?=' + STOP_RX + '|\\n|$)',
       'i'
     );
     let m = texto.match(rxMesmaLinha);
     if (m) {
-      const v = cleanValue(m[1]);
+      const v = isolarObjeto(cleanValue(m[1]));
       if (v && validaObjeto(v)) return v;
     }
 
-    /* Padrão 2: label sozinho numa linha, valor na linha seguinte */
+    /* Padrão 2: label sozinho, valor na linha seguinte */
     const rxProximaLinha = new RegExp(
-      LABEL_RX + '\\s*[:\\-–—]?\\s*[\\n\\r]+\\s*([^\\n]{8,300}?)(?=\\n|' + STOP_RX + '\\b|$)',
+      LABEL_RX + '\\s*[:\\-–—]?\\s*[\\n\\r]+\\s*([^\\n]{8,300}?)(?=' + STOP_RX + '|\\n|$)',
       'i'
     );
     m = texto.match(rxProximaLinha);
     if (m) {
-      const v = cleanValue(m[1]);
+      const v = isolarObjeto(cleanValue(m[1]));
       if (v && validaObjeto(v)) return v;
     }
 
-    /* Padrão 3: captura tudo até o próximo label (mais agressivo) */
+    /* Padrão 3: bloco multilinha até próximo stop */
     const rxGreedy = new RegExp(
-      LABEL_RX + '\\s*[:\\-–—]?\\s*([\\s\\S]{8,500}?)(?=' + STOP_RX + '\\b)',
+      LABEL_RX + '\\s*[:\\-–—]?\\s*([\\s\\S]{8,600}?)(?=' + STOP_RX + ')',
       'i'
     );
     m = texto.match(rxGreedy);
     if (m) {
-      const v = cleanValue(m[1]);
+      const v = isolarObjeto(cleanValue(m[1]));
       if (v && validaObjeto(v)) return v;
     }
 
@@ -569,7 +683,7 @@ const DFDParser = (() => {
 
     const celulas = construirCelulas(paginas);
 
-    /* Texto limpo para regex */
+    /* Texto para regex */
     const textoCompleto = paginas
       .flatMap(p => p.items.map(i => i.str))
       .join('\n');
@@ -588,8 +702,8 @@ const DFDParser = (() => {
         ['Item / Código do PCA','Item do PCA','Código do PCA','Código no PCA','Nº do Item no PCA'],
         validaPcaItem);
 
-    /* ✅ v6.3: Objeto — regex prioritária com 12 sinônimos */
-    const objeto =
+    /* ✅ v6.4: Objeto com isolarObjeto aplicado em qualquer via */
+    let objeto =
       extrairObjetoDoTexto(textoLimpo) ||
       extrairCampoValidado(celulas,
         [
@@ -604,6 +718,10 @@ const DFDParser = (() => {
           'Objeto',
         ],
         validaObjeto);
+
+    /* Belt-and-suspenders: se veio da label e ainda tem resíduo, corta */
+    if (objeto) objeto = isolarObjeto(objeto);
+    if (objeto && !validaObjeto(objeto)) objeto = '';
 
     const campos = {
       orgao:       extrairCampoValidado(celulas, ['Órgão / Entidade','Órgão Entidade','Órgão','Entidade']),
@@ -640,7 +758,7 @@ const DFDParser = (() => {
       fiscalTitular:    extrairCampoValidado(celulas, ['Fiscal Titular do Contrato','Fiscal Titular','Fiscal'], validaNome),
       fiscalSubstituto: extrairCampoValidado(celulas, ['Fiscal Substituto']),
       gestorContrato:   extrairCampoValidado(celulas, ['Gestor do Contrato','Gestor']),
-      qtdDescricao: extrairCampoValidado(celulas, ['Estimativa de Quantidades','Quantidade Estimada','Quantitativo'], v => /\d/.test(v)),
+      qtdDescricao: extrairCampoValidado(celulas, ['Estimativa de Quantidades','Quantidade Estimada','Quantitativo','Quantidades'], v => /\d/.test(v)),
       valor: normalizarMoeda(extrairCampoValidado(
         celulas,
         ['Valor Estimado da Contratação','Valor Total Estimado','Valor Estimado','Valor Global','Valor'],
@@ -699,7 +817,7 @@ const DFDParser = (() => {
     validaNumeroDFD, validaPcaItem, validaData,
     validaObjeto, validaNome, validaValor,
     extrairNumeroDFDDoTexto, extrairPcaItemDoTexto,
-    extrairObjetoDoTexto
+    extrairObjetoDoTexto, isolarObjeto
   };
 })();
 
