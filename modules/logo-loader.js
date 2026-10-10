@@ -1,50 +1,24 @@
 /* =====================================================================
-   OMNILICIT · Logo Loader v5.3
+   OMNILICIT · Logo Loader v6.0 — Simplificado
    ----------------------------------------------------------------
-   ✅ Prioridade #1: 'OmniLicit.png' (nome exato com maiúsculas)
-   ✅ Fallback em cascata: 14 variações de nome/path
-   ✅ Converte para Base64 (dataURL) para pdfMake
-   ✅ Fallback SVG: escudo OmniLicit (nunca fica sem logo)
+   ✅ Prioridade: 'logo-omnlicit.png' (nome oficial do repositório)
+   ✅ Fallback:   'logo.png' (nome genérico)
+   ✅ Último recurso: SVG inline (escudo OmniLicit)
    ===================================================================== */
 'use strict';
 
 const OmniLogo = (() => {
 
   /* ---------------------------------------------------------------------
-     ✅ LISTA DE BUSCA — ORDEM DE PRIORIDADE
-     O primeiro arquivo que existir é o usado.
+     LISTA DE BUSCA — apenas os nomes reais do projeto
      --------------------------------------------------------------------- */
   const CANDIDATOS = [
-    // 1º — NOME EXATO informado pelo usuário (case-sensitive)
-    'OmniLicit.png',
-
-    // 2º — Variações comuns do nome "OmniLicit"
-    'OmniLicit.PNG',
-    'OmniLicit.jpg',
-    'OmniLicit.jpeg',
-    'OmniLicit.webp',
-
-    // 3º — Variação sem "C" maiúsculo (usada em outros módulos do ecossistema)
-    'logo-omnilicit.png',
-
-    // 4º — Variação sem 2º "i" (também usada no ecossistema)
-    'logo-omnlicit.png',
-
-    // 5º — Nomes genéricos
-    'logo.png',
-    'Logo.png',
-    'LOGO.png',
-
-    // 6º — Subpastas comuns
-    'assets/OmniLicit.png',
-    'img/OmniLicit.png',
-    'images/OmniLicit.png',
-    'assets/logo-omnilicit.png',
-    'img/logo-omnilicit.png'
+    'logo-omnlicit.png',    // ← nome oficial (pasta raiz)
+    'logo.png',             // fallback genérico
   ];
 
   /* ---------------------------------------------------------------------
-     FALLBACK SVG — Escudo OmniLicit (usado se TODOS os 14 falharem)
+     FALLBACK SVG — Escudo OmniLicit (nunca fica sem logo)
      --------------------------------------------------------------------- */
   const FALLBACK_SVG = `
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 220">
@@ -87,8 +61,8 @@ const OmniLogo = (() => {
      --------------------------------------------------------------------- */
   let cacheDataUrl = null;
   let cacheOrigem  = 'none';   // 'oficial' | 'fallback' | 'manual' | 'none'
-  let cachePath    = null;     // ex.: 'OmniLicit.png'
-  let cachePromessa = null;    // evita fetches duplicados em paralelo
+  let cachePath    = null;     // ex.: 'logo-omnlicit.png'
+  let cachePromessa = null;
 
   /* ---------------------------------------------------------------------
      HELPERS
@@ -117,14 +91,8 @@ const OmniLogo = (() => {
     });
   }
 
-  /**
-   * Tenta carregar UMA url e devolve dataURL (base64) ou null.
-   * Estratégia em 2 camadas:
-   *  1) fetch + FileReader   (funciona em http/https)
-   *  2) Image + canvas       (funciona em file:// com CORS relaxado)
-   */
   async function tentarUrl(url) {
-    // ----- Camada 1: fetch -----
+    // Camada 1: fetch
     try {
       const resp = await fetch(url, { cache: 'force-cache' });
       if (!resp.ok) throw new Error('HTTP ' + resp.status);
@@ -133,12 +101,10 @@ const OmniLogo = (() => {
         throw new Error('resposta não é imagem');
       }
       const dUrl = await fileToDataUrl(blob);
-      if (dUrl && dUrl.length > 100) {
-        return { dataUrl: dUrl, via: 'fetch' };
-      }
-    } catch (_) { /* cai para camada 2 */ }
+      if (dUrl && dUrl.length > 100) return { dataUrl: dUrl, via: 'fetch' };
+    } catch (_) { }
 
-    // ----- Camada 2: <img> + <canvas> -----
+    // Camada 2: <img> + <canvas>
     try {
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -154,60 +120,39 @@ const OmniLogo = (() => {
       c.width = w; c.height = h;
       c.getContext('2d').drawImage(img, 0, 0);
       const dUrl = c.toDataURL('image/png');
-      if (dUrl && dUrl.length > 100) {
-        return { dataUrl: dUrl, via: 'img+canvas' };
-      }
-    } catch (_) { /* desiste desta URL */ }
+      if (dUrl && dUrl.length > 100) return { dataUrl: dUrl, via: 'img+canvas' };
+    } catch (_) { }
 
     return null;
   }
 
   /* ---------------------------------------------------------------------
-     LOAD — executado UMA vez e cacheado
+     LOAD
      --------------------------------------------------------------------- */
   async function load() {
-    // Cache pronto
     if (cacheDataUrl) return cacheDataUrl;
-
-    // Carregamento em andamento (evita chamadas duplicadas)
     if (cachePromessa) return cachePromessa;
 
     cachePromessa = (async () => {
 
-      /* -------- 1) Reaproveita do core OmniLicit (LicitaReq) se carregado -------- */
-      if (window.OmniLicit?.carregarLogoBase64) {
-        for (const path of CANDIDATOS) {
-          try {
-            const dUrl = await window.OmniLicit.carregarLogoBase64(path);
-            if (dUrl && dUrl.length > 100) {
-              cacheDataUrl = dUrl;
-              cacheOrigem  = 'oficial';
-              cachePath    = path;
-              console.info(`[OmniLogo] ✅ Carregada via OmniLicit core → ${path}`);
-              return cacheDataUrl;
-            }
-          } catch (_) { /* tenta próximo */ }
-        }
-      }
-
-      /* -------- 2) Tenta cada candidato localmente, na ordem de prioridade -------- */
+      /* 1) Tenta cada candidato */
       for (const path of CANDIDATOS) {
         const resultado = await tentarUrl(path);
         if (resultado) {
           cacheDataUrl = resultado.dataUrl;
           cacheOrigem  = 'oficial';
           cachePath    = path;
-          console.info(`[OmniLogo] ✅ Logo encontrada → ${path} (via ${resultado.via})`);
+          console.info(`[OmniLogo] ✅ Logo carregada → ${path} (via ${resultado.via})`);
           return cacheDataUrl;
         }
       }
 
-      /* -------- 3) Fallback SVG (nunca deixa sem logo) -------- */
+      /* 2) Fallback SVG */
       console.warn(
-        '[OmniLogo] ⚠️  Nenhum dos 14 arquivos foi encontrado — usando escudo SVG.\n' +
-        'Para usar sua logo, coloque o arquivo na RAIZ com um destes nomes:\n' +
-        CANDIDATOS.slice(0, 6).map(p => '    • ' + p).join('\n') +
-        '\n  Depois faça: git add <arquivo> && git commit -m "logo" && git push'
+        '[OmniLogo] ⚠️  Logo não encontrada — usando escudo SVG inline.\n' +
+        'Para usar sua logo, coloque o arquivo na raiz do projeto:\n' +
+        '    • ' + CANDIDATOS[0] + '\n' +
+        '  Depois: git add ' + CANDIDATOS[0] + ' && git commit -m "add logo" && git push'
       );
       cacheDataUrl = await svgToPngDataUrl(FALLBACK_SVG);
       cacheOrigem  = 'fallback';
@@ -219,7 +164,7 @@ const OmniLogo = (() => {
     try {
       return await cachePromessa;
     } finally {
-      cachePromessa = null; // libera para reuso
+      cachePromessa = null;
     }
   }
 
@@ -233,14 +178,14 @@ const OmniLogo = (() => {
   function clear()  { cacheDataUrl = null; cacheOrigem = 'none'; cachePath = null; cachePromessa = null; }
 
   /* ---------------------------------------------------------------------
-     DIAGNÓSTICO — chamável no console: OmniLogo.diagnostico()
+     DIAGNÓSTICO
      --------------------------------------------------------------------- */
   async function diagnostico() {
     console.group('[OmniLogo] Diagnóstico');
-    console.log('Candidatos testados:', CANDIDATOS);
-    console.log('Cache atual → origem :', cacheOrigem);
-    console.log('Cache atual → path   :', cachePath);
-    console.log('Cache atual → dataURL:', cacheDataUrl ? cacheDataUrl.slice(0, 60) + '…' : '(vazio)');
+    console.log('Candidatos:', CANDIDATOS);
+    console.log('Origem    :', cacheOrigem);
+    console.log('Path      :', cachePath);
+    console.log('dataURL   :', cacheDataUrl ? cacheDataUrl.slice(0, 80) + '…' : '(vazio)');
 
     const resultados = [];
     for (const path of CANDIDATOS) {
@@ -252,10 +197,7 @@ const OmniLogo = (() => {
     return resultados;
   }
 
-  return {
-    load, get, origem, path, set, clear,
-    diagnostico, CANDIDATOS
-  };
+  return { load, get, origem, path, set, clear, diagnostico, CANDIDATOS };
 })();
 
 window.OmniLogo = OmniLogo;
