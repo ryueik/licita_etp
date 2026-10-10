@@ -1,5 +1,6 @@
 /* =====================================================================
    OMNILICIT · LicitaETP v5.0 — Núcleo da Aplicação
+   Tema padrão: DARK · Logo dinâmica · Welcome com persistência
    ===================================================================== */
 'use strict';
 
@@ -8,16 +9,18 @@ const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c =>
   ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 
-/* ---------- TEMA ---------- */
+/* =====================================================================
+   TEMA
+   ===================================================================== */
 const TEMA_KEY = 'licitaetp_theme';
 
 function lerTemaSalvo() {
   try {
     const t = localStorage.getItem(TEMA_KEY);
     if (t === 'light' || t === 'dark') return t;
-    if (window.matchMedia?.('(prefers-color-scheme: dark)').matches) return 'dark';
   } catch (e) {}
-  return 'light';
+  // ✅ Padrão OmniLicit: DARK
+  return 'dark';
 }
 
 function aplicarTema(tema) {
@@ -25,55 +28,72 @@ function aplicarTema(tema) {
   const sun  = document.getElementById('iconSun');
   const moon = document.getElementById('iconMoon');
   if (!sun || !moon) return;
-  if (tema === 'dark') { sun.style.display = 'block'; moon.style.display = 'none'; }
-  else                  { sun.style.display = 'none';  moon.style.display = 'block'; }
+
+  if (tema === 'dark') {
+    // Em dark, mostra ☀️ (ação: mudar para claro)
+    sun.style.display  = 'block';
+    moon.style.display = 'none';
+  } else {
+    // Em light, mostra 🌙 (ação: mudar para escuro)
+    moon.style.display = 'block';
+    sun.style.display  = 'none';
+  }
 }
 
 function alternarTema() {
-  const atual = document.documentElement.getAttribute('data-theme') || 'light';
+  const atual = document.documentElement.getAttribute('data-theme') || 'dark';
   const novo  = atual === 'dark' ? 'light' : 'dark';
   aplicarTema(novo);
   try { localStorage.setItem(TEMA_KEY, novo); } catch (e) {}
   toast(`Tema alterado para ${novo === 'dark' ? 'escuro' : 'claro'}.`);
 }
 
-/* ---------- IDENTIDADE VISUAL ---------- */
+/* =====================================================================
+   IDENTIDADE VISUAL
+   ===================================================================== */
 async function injetarIdentidadeVisual() {
-  const logoDataUrl = OmniLogo.get();
-  if (!logoDataUrl) return;
+  const logoDataUrl = (typeof OmniLogo !== 'undefined' && OmniLogo.get) ? OmniLogo.get() : null;
 
   /* 1. Logo no header */
   const brand = document.getElementById('brandLogo');
   if (brand) {
-    brand.innerHTML = `<img src="${logoDataUrl}" alt="OmniLicit"
-                            style="width:100%;height:100%;object-fit:contain;border-radius:10px" />`;
+    const src = logoDataUrl || 'OmniLicit.png';
+    brand.innerHTML = `<img src="${src}" alt="OmniLicit"
+                            style="width:100%;height:100%;object-fit:contain;border-radius:10px"
+                            onerror="this.style.display='none'" />`;
   }
 
   /* 2. Logo no modal welcome */
   const w = document.getElementById('welcomeLogo');
   if (w) {
-    w.innerHTML = `<img src="${logoDataUrl}" alt="OmniLicit"
-                        style="width:100%;height:100%;object-fit:contain;border-radius:16px" />`;
+    const src = logoDataUrl || 'OmniLicit.png';
+    w.innerHTML = `<img src="${src}" alt="OmniLicit"
+                        style="width:100%;height:100%;object-fit:contain;border-radius:16px"
+                        onerror="this.style.display='none'" />`;
   }
 
-  /* 3. ✅ FAVICON — usa a logo real */
+  /* 3. ✅ FAVICON — sempre aponta para a logo real */
   const favicon = document.getElementById('favicon');
   if (favicon) {
     favicon.type = 'image/png';
-    favicon.href = logoDataUrl;
+    favicon.href = logoDataUrl || 'OmniLicit.png';
   }
 
-  /* 4. Preload da logo para performance em PDF */
-  try {
-    const link = document.createElement('link');
-    link.rel = 'preload';
-    link.as = 'image';
-    link.href = logoDataUrl;
-    document.head.appendChild(link);
-  } catch (_) {}
+  /* 4. Preload da logo (performance) */
+  if (logoDataUrl) {
+    try {
+      const link = document.createElement('link');
+      link.rel  = 'preload';
+      link.as   = 'image';
+      link.href = logoDataUrl;
+      document.head.appendChild(link);
+    } catch (_) {}
+  }
 }
 
-/* ---------- NUMERAÇÃO ETP ---------- */
+/* =====================================================================
+   NUMERAÇÃO ETP (sequencial por exercício)
+   ===================================================================== */
 const ETP_COUNTER_KEY = 'licitaetp_counter';
 
 function obterProximoNumeroETP(exercicio) {
@@ -107,39 +127,64 @@ function marcarNumeroEditado() {
   if (numEl) numEl.dataset.userEdited = '1';
 }
 
-/* ---------- WELCOME ---------- */
+/* =====================================================================
+   WELCOME / ONBOARDING
+   ===================================================================== */
 const WELCOME_KEY = 'licitaetp_welcome_dismissed';
+
 function deveExibirWelcome() {
   try { return localStorage.getItem(WELCOME_KEY) !== '1'; } catch (e) { return true; }
 }
+
 function abrirWelcome() {
   const m = document.getElementById('welcomeModal');
   if (!m) return;
+
+  // Pré-marca o checkbox conforme preferência anterior
+  const cb = document.getElementById('welcomeDontShow');
+  if (cb) {
+    try { cb.checked = localStorage.getItem(WELCOME_KEY) === '1'; } catch (e) {}
+  }
+
   m.classList.add('show');
   m.setAttribute('aria-hidden', 'false');
 }
+
 function fecharWelcome() {
   const cb = document.getElementById('welcomeDontShow');
-  if (cb?.checked) { try { localStorage.setItem(WELCOME_KEY, '1'); } catch (e) {} }
+
+  // ✅ Persiste a preferência: só salva se o usuário marcou o checkbox
+  if (cb?.checked) {
+    try { localStorage.setItem(WELCOME_KEY, '1'); } catch (e) {}
+  } else {
+    try { localStorage.removeItem(WELCOME_KEY); } catch (e) {}
+  }
+
   const m = document.getElementById('welcomeModal');
   if (!m) return;
   m.classList.remove('show');
   m.setAttribute('aria-hidden', 'true');
 }
+
 function abrirAjuda() {
+  // Reabre o welcome mesmo se o usuário já dispensou
   const cb = document.getElementById('welcomeDontShow');
   if (cb) cb.checked = false;
   abrirWelcome();
 }
 
-/* ---------- ESTADO ---------- */
-let logoDataUrl    = null;
-let logoOrigem     = 'default';
+/* =====================================================================
+   ESTADO GLOBAL
+   ===================================================================== */
+let logoDataUrl = null;
+let logoOrigem  = 'default';
 let current = 0;
 let panels  = [];
 let TOTAL   = 0;
 
-/* ---------- NAVEGAÇÃO ---------- */
+/* =====================================================================
+   NAVEGAÇÃO
+   ===================================================================== */
 const PASSOS = [
   { t:'Identificação do ETP',        s:'Dados institucionais e objeto' },
   { t:'I · Necessidade',             s:'Problema a ser resolvido' },
@@ -175,20 +220,25 @@ function goTo(i) {
   current = i;
   panels.forEach((p, idx) => p.classList.toggle('hidden', idx !== current));
   renderNav();
+
   const counter = document.getElementById('stepCounter');
   if (counter) counter.textContent = `${current + 1} / ${TOTAL}`;
   const bar = document.getElementById('progressBar');
   if (bar) bar.style.width = `${((current + 1) / TOTAL) * 100}%`;
+
   const btnV = document.getElementById('btnVoltar');
   const btnP = document.getElementById('btnProximo');
   const btnG = document.getElementById('btnGerar');
   if (btnV) btnV.disabled = current === 0;
   if (btnP) btnP.classList.toggle('hidden', current === TOTAL - 1);
   if (btnG) btnG.classList.toggle('hidden', current !== TOTAL - 1);
+
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-/* ---------- LINHAS DINÂMICAS ---------- */
+/* =====================================================================
+   LINHAS DINÂMICAS
+   ===================================================================== */
 function addQtd(d = {}) {
   const tb = document.getElementById('tbQtd');
   if (!tb) return;
@@ -271,7 +321,9 @@ function recalcularTotal() {
   return soma;
 }
 
-/* ---------- COLETA ---------- */
+/* =====================================================================
+   COLETA DE DADOS
+   ===================================================================== */
 function readTable(tbodyId, keys) {
   const tb = document.getElementById(tbodyId);
   if (!tb) return [];
@@ -339,7 +391,9 @@ function coletarDados() {
   };
 }
 
-/* ---------- CONFORMIDADE ---------- */
+/* =====================================================================
+   CONFORMIDADE (11 Incisos)
+   ===================================================================== */
 const INCISOS = [
   { n:'I',    t:'Descrição da necessidade',           f:d => [d.nec.necessidade, d.nec.causaRaiz, d.nec.publicoAlvo] },
   { n:'II',   t:'Alinhamento ao PCA e enquadramento', f:d => [d.pca.previsto, d.pca.item, d.pca.justificativa, d.enq.dotacao, d.enq.fonte, d.enq.modalidade, d.enq.criterio] },
@@ -367,7 +421,9 @@ function calcularConformidade(d) {
   return { linhas, score };
 }
 
-/* ---------- MODAL DFD ---------- */
+/* =====================================================================
+   MODAL DFD
+   ===================================================================== */
 let dfdExtraido = null;
 
 function abrirImportarDFD() {
@@ -380,6 +436,7 @@ function abrirImportarDFD() {
   if (btn) btn.disabled = true;
   dfdExtraido = null;
 }
+
 function fecharImportarDFD() {
   const m = document.getElementById('dfdModal');
   if (!m) return;
@@ -387,6 +444,7 @@ function fecharImportarDFD() {
   m.setAttribute('aria-hidden', 'true');
 }
 
+/* --- Extração de logo embutida em PDF do DFD --- */
 async function extrairLogoDoPdf(file) {
   if (!window.pdfjsLib) return null;
   pdfjsLib.GlobalWorkerOptions.workerSrc =
@@ -482,6 +540,7 @@ function bitmapParaDataUrl(imgObj) {
   } catch (e) { console.warn('[Logo] bitmapParaDataUrl falhou:', e); return null; }
 }
 
+/* --- Processamento do DFD (delega ao DFDParser) --- */
 async function processarDFD(file) {
   const msgEl = document.getElementById('dfdResultMsg');
   const list  = document.getElementById('dfdResultList');
@@ -547,6 +606,7 @@ async function processarDFD(file) {
   }
 }
 
+/* --- Aplicação dos campos no formulário --- */
 function aplicarImportacaoDFD() {
   try {
     if (!dfdExtraido) { toast('Nenhum DFD carregado. Importe o arquivo primeiro.'); return; }
@@ -593,6 +653,7 @@ function aplicarImportacaoDFD() {
       }
     }
 
+    /* Valor → primeira linha de preço */
     if (c.valor) {
       let primeiro = document.querySelector('#tbPreco tr');
       if (!primeiro) { addPreco(); primeiro = document.querySelector('#tbPreco tr'); }
@@ -609,6 +670,7 @@ function aplicarImportacaoDFD() {
       }
     }
 
+    /* Quantitativo → primeira linha de quantidades */
     if (c.qtdDescricao) {
       let primeiroQ = document.querySelector('#tbQtd tr');
       if (!primeiroQ) { addQtd(); primeiroQ = document.querySelector('#tbQtd tr'); }
@@ -620,6 +682,7 @@ function aplicarImportacaoDFD() {
       }
     }
 
+    /* Governança → primeiro aprovador */
     const lstAprov = document.getElementById('listaAprovadores');
     if (lstAprov && c.fiscalTitular) {
       const primeiroCard = lstAprov.querySelector('.aprov-card');
@@ -631,6 +694,7 @@ function aplicarImportacaoDFD() {
       if (papelEl) papelEl.value = 'Fiscal Técnico';
     }
 
+    /* Logo capturada do PDF */
     let origemLogo = 'default';
     if (dfdExtraido.logo) {
       aplicarLogoCapturada(dfdExtraido.logo, 'dfd');
@@ -689,7 +753,9 @@ function aplicarLogoCapturada(dataUrl, origem = 'dfd') {
   }
 }
 
-/* ---------- GERAR PDF ---------- */
+/* =====================================================================
+   GERAR PDF
+   ===================================================================== */
 async function gerarPDF() {
   const d = coletarDados();
 
@@ -699,6 +765,7 @@ async function gerarPDF() {
     return;
   }
 
+  /* Consome número sequencial do ETP se o usuário não editou */
   const exMatch = (d.id.exercicio || '').match(/\d{4}/);
   const exercicio = exMatch ? exMatch[0] : String(new Date().getFullYear());
 
@@ -716,7 +783,7 @@ async function gerarPDF() {
     const resultado = await PDFEngine.gerar(d, conf, {
       exercicio,
       arquivoNome: arquivo,
-      logoDataUrl: OmniLogo.get() || logoDataUrl
+      logoDataUrl: (typeof OmniLogo !== 'undefined' && OmniLogo.get) ? OmniLogo.get() : (logoDataUrl || null)
     });
     toast(`PDF gerado: ${resultado.arquivo} · ${resultado.tag}`);
   } catch (err) {
@@ -725,7 +792,9 @@ async function gerarPDF() {
   }
 }
 
-/* ---------- RASCUNHO ---------- */
+/* =====================================================================
+   RASCUNHO (salvar / carregar JSON)
+   ===================================================================== */
 function salvarRascunho() {
   try {
     const pacote = {
@@ -755,6 +824,7 @@ function salvarRascunho() {
     toast('Falha ao salvar rascunho.');
   }
 }
+
 function abrirCarregarRascunho() {
   document.getElementById('jsonFile')?.click();
 }
@@ -874,7 +944,9 @@ function aplicarDados(d) {
   }
 }
 
-/* ---------- DROPZONES ---------- */
+/* =====================================================================
+   DROPZONES
+   ===================================================================== */
 function inicializarDropzoneLogo() {
   const dz    = document.getElementById('logoDropzone');
   const input = document.getElementById('logoFile');
@@ -939,6 +1011,7 @@ function inicializarDropzoneLogo() {
       toast('Falha ao ler o arquivo.');
     }
   }
+
   function fmt(b) {
     if (b < 1024) return b + ' B';
     if (b < 1024 * 1024) return (b / 1024).toFixed(1) + ' KB';
@@ -972,7 +1045,9 @@ function inicializarDropzoneDFD() {
   });
 }
 
-/* ---------- TOAST ---------- */
+/* =====================================================================
+   TOAST
+   ===================================================================== */
 let toastTimer;
 function toast(msg) {
   const el = document.getElementById('toast');
@@ -983,17 +1058,26 @@ function toast(msg) {
   toastTimer = setTimeout(() => el.classList.remove('show'), 4200);
 }
 
-/* ---------- BOOTSTRAP ---------- */
+/* =====================================================================
+   BOOTSTRAP
+   ===================================================================== */
 document.addEventListener('DOMContentLoaded', async () => {
+  /* 1. Tema */
   aplicarTema(lerTemaSalvo());
 
-  /* ✅ Carrega logo (arquivo ou SVG inline) e injeta em header/welcome/favicon */
-  await OmniLogo.load();
+  /* 2. Logo oficial (arquivo ou SVG inline do loader) */
+  if (typeof OmniLogo !== 'undefined' && OmniLogo.load) {
+    try { await OmniLogo.load(); } catch (e) { console.warn('[OmniLogo]', e); }
+  }
+
+  /* 3. Injeta logo em header / welcome / favicon */
   await injetarIdentidadeVisual();
 
+  /* 4. Data padrão */
   const dtEl = document.getElementById('dataElaboracao');
   if (dtEl && !dtEl.value) dtEl.value = new Date().toISOString().slice(0, 10);
 
+  /* 5. Painéis e navegação */
   panels = $$('[data-panel]');
   TOTAL  = panels.length;
 
@@ -1004,24 +1088,29 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (!document.getElementById('numeroEtp').dataset.userEdited) preencherNumeroETPInicial();
   });
 
+  /* 6. Dropzones */
   inicializarDropzoneLogo();
   inicializarDropzoneDFD();
 
+  /* 7. Carregar rascunho JSON */
   document.getElementById('jsonFile')?.addEventListener('change', e => {
     const f = e.target.files?.[0];
     if (f) processarArquivoJSON(f);
     e.target.value = '';
   });
 
+  /* 8. Linhas iniciais dinâmicas */
   addQtd();
   addMercado(); addMercado();
   addPreco();
   addAprovador({ papel: 'Elaborador' });
 
+  /* 9. Recalcular total sempre que mexer na tabela de preços */
   document.addEventListener('input', e => {
     if (e.target.closest('#tbPreco')) recalcularTotal();
   });
 
+  /* 10. Modais: fechar ao clicar no overlay ou ESC */
   document.querySelectorAll('.modal-overlay').forEach(m => {
     m.addEventListener('click', e => { if (e.target === m) m.classList.remove('show'); });
   });
@@ -1029,9 +1118,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (e.key === 'Escape') $$('.modal-overlay.show').forEach(m => m.classList.remove('show'));
   });
 
+  /* 11. Navegação inicial */
   renderNav();
   goTo(0);
 
+  /* 12. Score em tempo real */
   setInterval(() => {
     const conf = calcularConformidade(coletarDados());
     const b = document.getElementById('scoreBadge');
@@ -1052,12 +1143,14 @@ document.addEventListener('DOMContentLoaded', async () => {
     }
   }, 1200);
 
+  /* 13. Welcome modal (só se não dispensado) */
   if (deveExibirWelcome()) setTimeout(abrirWelcome, 500);
 
+  /* 14. Log de status */
   console.info(
     `[OmniLicit] LicitaETP v5.0 carregado\n` +
-    `  Logo origem : ${OmniLogo.origem()}\n` +
-    `  Logo path   : ${OmniLogo.path() || 'inline'}\n` +
+    `  Tema        : ${lerTemaSalvo()}\n` +
+    `  Logo origem : ${(typeof OmniLogo !== 'undefined' && OmniLogo.origem) ? OmniLogo.origem() : 'n/a'}\n` +
     `  Módulos     : OmniLogo · DFDParser · PDFEngine`
   );
 });
