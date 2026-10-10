@@ -1,13 +1,10 @@
 /* =====================================================================
-   OMNILICIT · LicitaETP · DFD Parser Universal
-   Extrai campos estruturados de DFD em PDF (posicional + textual)
-   ou JSON (LicitaReq / OmniLicit).
+   OMNILICIT · LicitaETP · DFD Parser Universal v5.0
    ===================================================================== */
 'use strict';
 
 const DFDParser = (() => {
 
-  /* ---------- 2.1 Normalização e blacklist ---------- */
   const norm = s => String(s ?? '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().replace(/[:\-–—|.,;]+/g, ' ')
@@ -48,12 +45,10 @@ const DFDParser = (() => {
     if (text == null) return '';
     let v = String(text).replace(/\r/g, '\n').replace(/\n+/g, ' ')
                         .replace(/\t/g, ' ').replace(/\s{2,}/g, ' ');
-    // Anti-paginação
     v = v.replace(/\b(?:P[áa]gina|Page)\s+\d+\s*(?:de|of|\/)\s*\d+\b/gi, ' ');
     v = v.replace(/^\s*\d+\s*(?:de|\/)\s*\d+\s*$/gm, ' ');
     v = v.replace(/^[\s:;\-–—_\/|>»•·●◦‣▪►]+/, '');
     v = v.replace(/[\s:;\-–—_\/|]+$/, '');
-    // Fragmentos residuais de rótulos
     [
       /cargo\s*\/\s*fun[çc][ãa]o\s*[:\-–—]?\s*/gi,
       /respons[áa]vel\s+(?:pela|da)\s+demanda\s*[:\-–—]?\s*/gi,
@@ -65,7 +60,6 @@ const DFDParser = (() => {
       /processo\s+administrativo\s*[:\-–—]?\s*/gi,
       /^\s*dfd\s*[:\-–—]?\s*/gi
     ].forEach(rx => { v = v.replace(rx, ' '); });
-
     v = v.replace(/\s{2,}/g, ' ').trim();
     return ehLabel(v) ? '' : v;
   };
@@ -80,7 +74,6 @@ const DFDParser = (() => {
     return isNaN(n) ? '' : n.toFixed(2);
   };
 
-  /* ---------- 2.2 JSON ---------- */
   async function fromJSON(file) {
     const txt = await file.text();
     let raw;
@@ -109,34 +102,22 @@ const DFDParser = (() => {
         telefone:    cleanValue(pick('telefone','fone','ramal')),
         processo:    cleanValue(pick('processo','processoAdministrativo','numeroProcesso')),
         data:        cleanValue(pick('data','dataElaboracao','data_elaboracao')),
-
         objeto:        cleanValue(pick('objeto','objetoContratacao','descricao','descricaoObjeto','descricaoResumida')),
         justificativa: cleanValue(pick('justificativa','descricaoNecessidade','necessidade','motivacao')),
-
-        // PCA
         pcaItem:        cleanValue(pick('pcaItem','itemPca','codigoPca','pca')),
         pcaPrevisto:    cleanValue(pick('pcaPrevisto','previstoPca')) || 'Sim',
         pcaJustificativa: cleanValue(pick('pcaJustificativa','justificativaPca')),
-
-        // Enquadramento
         dotacao:      cleanValue(pick('dotacao','dotacaoOrcamentaria','rubrica')),
         fonteRecurso: cleanValue(pick('fonteRecurso','fonte','naturezaDespesa')),
         modalidade:   cleanValue(pick('modalidade','modalidadePretendida','modalidadeLicitacao')),
         criterio:     cleanValue(pick('criterio','criterioJulgamento','tipoJulgamento')),
-
-        // Prazos / entrega
         prazoExecucao:      cleanValue(pick('prazoExecucao','prazoEntrega','prazo')),
         localEntrega:       cleanValue(pick('localEntrega','local')),
         condicoesPagamento: cleanValue(pick('condicoesPagamento','formaPagamento')),
-
-        // Governança
         fiscalTitular:    cleanValue(pick('fiscalTitular','fiscal')),
         fiscalSubstituto: cleanValue(pick('fiscalSubstituto')),
         gestorContrato:   cleanValue(pick('gestorContrato','gestor')),
-
-        // Quantitativo textual
         qtdDescricao: cleanValue(pick('quantidadeDescricao','qtdDescricao','quantitativo')),
-
         valor: normalizarMoeda(pick('valor','valorEstimado','valorTotal','valorGlobal','total'))
       },
       raw,
@@ -144,7 +125,6 @@ const DFDParser = (() => {
     };
   }
 
-  /* ---------- 2.3 PDF (posicional + textual) ---------- */
   function construirCelulas(paginas) {
     const celulas = [];
     for (const pag of paginas) {
@@ -260,40 +240,31 @@ const DFDParser = (() => {
       cargo:       extrairCampo(celulas, ['Cargo / Função','Cargo/Função','Cargo e Função','Cargo','Função']),
       processo:    extrairCampo(celulas, ['Processo Administrativo','Nº do Processo','Processo']),
       data:        extrairCampo(celulas, ['Data de Elaboração','Data']),
-
       objeto:        extrairCampo(celulas, ['Descrição Resumida do Objeto','Descrição do Objeto','Objeto da Contratação','Objeto da Demanda','Objeto']),
       justificativa: extrairCampo(celulas, ['Justificativa da Necessidade Pública','Justificativa da Necessidade','Justificativa da Demanda','Justificativa']),
-
       pcaItem:      extrairCampo(celulas, ['Item / Código do PCA','Item do PCA','Código do PCA','PCA']),
       pcaPrevisto:  extrairCampo(celulas, ['Demanda prevista no PCA','Previsão no PCA','PCA']),
-
       dotacao:      extrairCampo(celulas, ['Dotação Orçamentária','Dotação','Rubrica']),
       fonteRecurso: extrairCampo(celulas, ['Fonte de Recurso','Fonte']),
       modalidade:   extrairCampo(celulas, ['Modalidade Pretendida','Modalidade de Licitação','Modalidade']),
       criterio:     extrairCampo(celulas, ['Critério de Julgamento','Tipo de Julgamento','Critério']),
-
       prazoExecucao:      extrairCampo(celulas, ['Prazo de Execução','Prazo de Entrega','Prazo']),
       localEntrega:       extrairCampo(celulas, ['Local de Entrega','Local']),
       condicoesPagamento: extrairCampo(celulas, ['Condições de Pagamento','Forma de Pagamento']),
-
       fiscalTitular:    extrairCampo(celulas, ['Fiscal Titular do Contrato','Fiscal Titular','Fiscal']),
       fiscalSubstituto: extrairCampo(celulas, ['Fiscal Substituto']),
       gestorContrato:   extrairCampo(celulas, ['Gestor do Contrato','Gestor']),
-
       qtdDescricao: extrairCampo(celulas, ['Estimativa de Quantidades','Quantidade Estimada','Quantitativo']),
-
       numero: extrairCampo(celulas, ['Nº do DFD','Número do DFD','DFD']),
       valor:  normalizarMoeda(extrairCampo(celulas, ['Valor Estimado da Contratação','Valor Total Estimado','Valor Estimado','Valor Global','Valor']))
     };
 
-    // Fallback: e-mail e telefone por regex
     const textoPlano = paginas.flatMap(p => p.items.map(i => i.str)).join(' ');
     const emailM = textoPlano.match(/([\w._%+\-]+@[\w.\-]+\.[A-Za-z]{2,})/);
     if (emailM) campos.email = cleanValue(emailM[1]);
     const telM = textoPlano.match(/(?:Telefone|Tel|Fone|Ramal)\s*[:\-–—]?\s*(\(?\d{2}\)?\s*[\s\-]?\d{4,5}[\s\-]?\d{4})/i);
     if (telM) campos.telefone = cleanValue(telM[1]);
 
-    // Fallback regex para modalidade / critério
     if (!campos.modalidade) {
       const m = textoPlano.match(/\b(Preg[ãa]o\s+Eletr[ôo]nico|Concorr[êe]ncia\s+Eletr[ôo]nica|Dispensa\s+Eletr[ôo]nica|Inexigibilidade|Leil[ãa]o|Di[áa]logo\s+Competitivo)\b/i);
       if (m) campos.modalidade = cleanValue(m[1]);
@@ -303,7 +274,6 @@ const DFDParser = (() => {
       if (m) campos.criterio = cleanValue(m[1]);
     }
 
-    // Anti-paginação final
     Object.keys(campos).forEach(k => {
       if (typeof campos[k] === 'string') campos[k] = cleanValue(campos[k]);
     });
@@ -311,7 +281,6 @@ const DFDParser = (() => {
     return { origem: 'pdf', campos, raw: textoPlano };
   }
 
-  /* ---------- 2.4 Roteador ---------- */
   async function parse(file) {
     const nome = (file?.name || '').toLowerCase();
     const tipo = (file?.type || '').toLowerCase();
