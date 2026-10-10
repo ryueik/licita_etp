@@ -1,9 +1,9 @@
 /* =====================================================================
-   OMNILICIT · LicitaETP · DFD Parser Universal v6.1
+   OMNILICIT · LicitaETP · DFD Parser Universal v6.2
    ---------------------------------------------------------------------
-   ✅ v6.1: validadores específicos para Numero DFD, PCA Item e Data
-   ✅ Sanitização de rodapé (Emitido em, SHA-256, TAGs, paginação)
-   ✅ Filtro ehRuido() em todos os valores extraídos
+   ✅ v6.2: Regex prioritária para Nº DFD e PCA Item
+   ✅ Removido "fallback de melhor esforço" (retornava valor errado)
+   ✅ Sanitização de rodapé + filtro ehRuido em todos os campos
    ===================================================================== */
 'use strict';
 
@@ -136,10 +136,8 @@ const DFDParser = (() => {
   };
 
   /* =====================================================================
-     5. VALIDADORES ESPECÍFICOS — CORAÇÃO DA v6.1
+     5. VALIDADORES ESPECÍFICOS
      ===================================================================== */
-
-  /* -------- MOEDA -------- */
   const normalizarMoeda = v => {
     if (!v) return '';
     let s = String(v).replace(/[^\d.,]/g, '');
@@ -150,79 +148,62 @@ const DFDParser = (() => {
     return isNaN(n) ? '' : n.toFixed(2);
   };
 
-  /* -------- ✅ Nº DO DFD — rejeita datas e aceita só identificadores -------- */
+  /* -------- Nº DO DFD — rejeita datas -------- */
   const validaNumeroDFD = v => {
     if (!v || v.length < 3) return false;
     const s = String(v).trim();
 
-    // ❌ Rejeita datas puras (dd/mm/yyyy ou dd-mm-yyyy)
+    // ❌ Rejeita data pura
     if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}$/.test(s)) return false;
-
-    // ❌ Rejeita apenas números longos sem separador de ano
-    if (/^\d{4,}$/.test(s)) return false;
-
-    // ❌ Rejeita horário
+    // ❌ Rejeita hora
     if (/^\d{1,2}:\d{2}(:\d{2})?$/.test(s)) return false;
-
-    // ❌ Rejeita se for modalidade ou tipo de documento genérico
+    // ❌ Rejeita só número longo
+    if (/^\d{4,}$/.test(s)) return false;
+    // ❌ Rejeita modalidade
     if (/^(Preg[ãa]o|Concorr[êe]ncia|Dispensa|Inexigibilidade|Leil[ãa]o|Di[áa]logo)/i.test(s)) return false;
+    // ❌ Rejeita ISO date
+    if (/^\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}$/.test(s)) return false;
 
-    // ✅ Aceita se contém "DFD" explicitamente
+    // ✅ Aceita "DFD 042/2026" ou similar
     if (/\bDFD\b/i.test(s)) return true;
-
-    // ✅ Aceita se é "NNN/YYYY" ou "NNN-YYYY" ou "NNN.YYYY"
+    // ✅ Aceita "042/2026" ou "042-2026"
     if (/^\s*\d{1,6}\s*[\/\-\.]\s*\d{2,4}\s*$/.test(s)) return true;
-
-    // ✅ Aceita se tem "Nº" e número
-    if (/n[º°]?\s*\d{1,6}/i.test(s)) return true;
+    // ✅ Aceita "Nº 042/2026"
+    if (/n[º°]?\s*\d{1,6}\s*[\/\-\.]\s*\d{2,4}/i.test(s)) return true;
 
     return false;
   };
 
-  /* -------- ✅ ITEM DO PCA — rejeita modalidade, aceita código -------- */
+  /* -------- PCA ITEM — rejeita modalidade -------- */
   const validaPcaItem = v => {
     if (!v || v.length < 4) return false;
     const s = String(v).trim();
 
-    // ❌ Rejeita modalidade de licitação
+    // ❌ Rejeita modalidade
     if (/^(Preg[ãa]o|Concorr[êe]ncia|Dispensa|Inexigibilidade|Leil[ãa]o|Di[áa]logo)/i.test(s)) return false;
-
-    // ❌ Rejeita tipo de documento genérico
-    if (/^(DFD|ETP|TR|Edital|Processo|Ofício)\b/i.test(s)) return false;
-
     // ❌ Rejeita data
     if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}$/.test(s)) return false;
+    // ❌ Rejeita tipo documento puro
+    if (/^(DFD|ETP|TR|Edital|Processo|Ofício)\s*$/i.test(s)) return false;
 
-    // ✅ Aceita se contém "PCA" explicitamente
+    // ✅ Aceita contendo "PCA"
     if (/\bPCA\b/i.test(s)) return true;
-
-    // ✅ Aceita se contém "ITEM" com número (ex: "ITEM-042", "IT 042")
+    // ✅ Aceita "ITEM-042"
     if (/\bITE?M\b[\s\-–—_]?\d{1,6}/i.test(s)) return true;
-
-    // ✅ Aceita formato "NNNN-YYYY-ITEM-NNN" ou similar
-    if (/\b\d{3,4}[\s\-–—_]\d{4}[\s\-–—_]ITEM[\s\-–—_]\d{1,6}\b/i.test(s)) return true;
 
     return false;
   };
 
-  /* -------- ✅ DATA — só aceita formatos de data -------- */
+  /* -------- DATA — só aceita formatos de data -------- */
   const validaData = v => {
     if (!v) return false;
     const s = String(v).trim();
-
-    // ✅ dd/mm/yyyy, dd-mm-yyyy, dd.mm.yyyy
     if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}$/.test(s)) return true;
-
-    // ✅ yyyy-mm-dd (ISO)
     if (/^\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2}$/.test(s)) return true;
-
-    // ✅ dd de mês de yyyy
     if (/^\d{1,2}\s+de\s+[a-zç]+(\s+de\s+\d{4})?/i.test(s)) return true;
-
     return false;
   };
 
-  /* -------- OUTROS VALIDADORES (mantidos) -------- */
   const validaObjeto = v => {
     if (!v || v.length < 10) return false;
     if (ehRuido(v)) return false;
@@ -284,29 +265,22 @@ const DFDParser = (() => {
         telefone:    cleanValue(pick('telefone','fone','ramal')),
         processo:    cleanValue(pick('processo','processoAdministrativo','numeroProcesso')),
         data:        cleanValue(pick('data','dataElaboracao','data_elaboracao')),
-
         objeto:        cleanValue(pick('objeto','objetoContratacao','descricao','descricaoObjeto','descricaoResumida')),
         justificativa: cleanValue(pick('justificativa','descricaoNecessidade','necessidade','motivacao')),
-
         pcaItem:          cleanValue(pick('pcaItem','itemPca','codigoPca','pca')),
         pcaPrevisto:      cleanValue(pick('pcaPrevisto','previstoPca')) || 'Sim',
         pcaJustificativa: cleanValue(pick('pcaJustificativa','justificativaPca')),
-
         dotacao:      cleanValue(pick('dotacao','dotacaoOrcamentaria','rubrica')),
         fonteRecurso: cleanValue(pick('fonteRecurso','fonte','naturezaDespesa')),
         modalidade:   cleanValue(pick('modalidade','modalidadePretendida','modalidadeLicitacao')),
         criterio:     cleanValue(pick('criterio','criterioJulgamento','tipoJulgamento')),
-
         prazoExecucao:      cleanValue(pick('prazoExecucao','prazoEntrega','prazo')),
         localEntrega:       cleanValue(pick('localEntrega','local')),
         condicoesPagamento: cleanValue(pick('condicoesPagamento','formaPagamento')),
-
         fiscalTitular:    cleanValue(pick('fiscalTitular','fiscal')),
         fiscalSubstituto: cleanValue(pick('fiscalSubstituto')),
         gestorContrato:   cleanValue(pick('gestorContrato','gestor')),
-
         qtdDescricao: cleanValue(pick('quantidadeDescricao','qtdDescricao','quantitativo')),
-
         valor: normalizarMoeda(pick('valor','valorEstimado','valorTotal','valorGlobal','total'))
       },
       raw,
@@ -374,45 +348,10 @@ const DFDParser = (() => {
     return achados[0].cel;
   }
 
-  function extrairValorDeLabel(celulas, labelCel) {
-    if (!labelCel) return '';
-
-    /* 1) Direita (mesma linha) */
-    const direita = celulas.filter(c =>
-      c.page === labelCel.page &&
-      Math.abs(c.y - labelCel.y) < 3.5 &&
-      c.x > labelCel.x + labelCel.w - 2 &&
-      !ehLabel(c.text) &&
-      !ehRuido(c.text)
-    ).sort((a, b) => a.x - b.x);
-    if (direita.length) {
-      const v = cleanValue(direita[0].text);
-      if (v) return v;
-    }
-
-    /* 2) Abaixo (mesma coluna) */
-    const x0 = labelCel.x - 15;
-    const x1 = labelCel.x + Math.max(280, labelCel.w + 260);
-    const abaixo = celulas.filter(c =>
-      c.page === labelCel.page &&
-      c.y < labelCel.y - 3 && c.y > labelCel.y - 90 &&
-      c.x >= x0 && c.x <= x1 &&
-      !ehLabel(c.text) &&
-      !ehRuido(c.text)
-    ).sort((a, b) => (b.y - a.y) || (a.x - b.x));
-
-    for (const c of abaixo) {
-      const v = cleanValue(c.text);
-      if (v) return v;
-    }
-
-    return '';
-  }
-
   /**
-   * Extrai um campo tentando o label à direita/abaixo.
-   * ✅ v6.1: se o validador rejeitar, tenta buscar em CÉLULAS VIZINHAS
-   * (mesma linha, mas em outras colunas) antes de desistir.
+   * ✅ v6.2: SEM "fallback de melhor esforço".
+   * Se nenhum candidato passar no validador, retorna '' e o chamador
+   * usa o fallback por regex.
    */
   function extrairCampoValidado(celulas, rotulos, validador) {
     const lc = buscarLabel(celulas, rotulos);
@@ -420,40 +359,36 @@ const DFDParser = (() => {
 
     const candidatos = [];
 
-    /* A) Direita (mesma linha) */
+    // A) Direita (mesma linha)
     const direita = celulas.filter(c =>
       c.page === lc.page &&
       Math.abs(c.y - lc.y) < 3.5 &&
       c.x > lc.x + lc.w - 2 &&
-      !ehLabel(c.text) &&
-      !ehRuido(c.text)
+      !ehLabel(c.text) && !ehRuido(c.text)
     ).sort((a, b) => a.x - b.x);
     candidatos.push(...direita.map(c => c.text));
 
-    /* B) Abaixo (mesma coluna, ±260px) */
+    // B) Abaixo (mesma coluna)
     const x0 = lc.x - 15;
     const x1 = lc.x + Math.max(280, lc.w + 260);
     const abaixo = celulas.filter(c =>
       c.page === lc.page &&
       c.y < lc.y - 3 && c.y > lc.y - 90 &&
       c.x >= x0 && c.x <= x1 &&
-      !ehLabel(c.text) &&
-      !ehRuido(c.text)
+      !ehLabel(c.text) && !ehRuido(c.text)
     ).sort((a, b) => (b.y - a.y) || (a.x - b.x));
     candidatos.push(...abaixo.map(c => c.text));
 
-    /* C) ✅ v6.1: linha TODA (qualquer coluna) — para o caso de labels
-          em coluna 1 e valores em coluna 3, com "buraco" no meio */
+    // C) Toda a linha à direita do label
     const linhaInteira = celulas.filter(c =>
       c.page === lc.page &&
       Math.abs(c.y - lc.y) < 3.5 &&
       c.x > lc.x &&
-      !ehLabel(c.text) &&
-      !ehRuido(c.text)
+      !ehLabel(c.text) && !ehRuido(c.text)
     ).sort((a, b) => a.x - b.x);
     candidatos.push(...linhaInteira.map(c => c.text));
 
-    /* Testa cada candidato até achar um que o validador aceite */
+    // ✅ Retorna APENAS se passar no validador
     for (const raw of candidatos) {
       const v = cleanValue(raw);
       if (!v) continue;
@@ -462,10 +397,81 @@ const DFDParser = (() => {
       return v;
     }
 
-    /* Nenhum passou no validador — devolve o primeiro limpo (melhor esforço) */
-    for (const raw of candidatos) {
-      const v = cleanValue(raw);
-      if (v && !ehRuido(v)) return v;
+    return '';
+  }
+
+  /* =====================================================================
+     ✅ v6.2: EXTRATORES POR REGEX (PRIORITÁRIOS)
+     ===================================================================== */
+
+  /**
+   * Nº do DFD — extração por regex específica.
+   * Retorna '' se nenhum padrão bater.
+   */
+  function extrairNumeroDFDDoTexto(texto) {
+    if (!texto) return '';
+
+    const padroes = [
+      // "DFD 042/2026", "DFD nº 042/2026", "DFD nº 042 de 2026"
+      /\bDFD[\s\-–—:]*n?[º°]?\s*(\d{1,6})\s*[\/\-–—\s]\s*(?:de\s+)?(\d{2,4})\b/i,
+      // "DFD-042/2026"
+      /\bDFD[\s\-–—_]*(\d{1,6})\s*[\/\-–—_]\s*(\d{2,4})\b/i,
+      // "Nº do DFD: 042/2026"
+      /(?:N[º°]?\s*DO\s+DFD|NÚMERO\s+DO\s+DFD|NUMERO\s+DO\s+DFD)[^\d]{0,30}(\d{1,6})\s*[\/\-–—_]\s*(\d{2,4})/i,
+      // "Expediente: 042/2026"
+      /Expediente[^\d]{0,30}(\d{1,6})\s*[\/\-–—_]\s*(\d{2,4})/i,
+    ];
+
+    for (const rx of padroes) {
+      const m = texto.match(rx);
+      if (m) {
+        const num = (m[1] || '').replace(/\D/g, '');
+        const ano = (m[2] || '').replace(/\D/g, '');
+        if (!num) continue;
+        const val = ano ? `${num}/${ano}` : num;
+        if (validaNumeroDFD(val)) return val;
+      }
+    }
+    return '';
+  }
+
+  /**
+   * Item do PCA — extração por regex específica.
+   * Retorna '' se nenhum padrão bater.
+   */
+  function extrairPcaItemDoTexto(texto) {
+    if (!texto) return '';
+
+    const padroes = [
+      // "PCA-2026-ITEM-042" (formato canônico)
+      /\b(PCA[\s\-–—_\/]+\d{4}[\s\-–—_\/]+ITE?M[\s\-–—_\/]+\d{1,6})\b/i,
+      // "PCA 2026 ITEM 042" (com espaços)
+      /\bPCA\s+(\d{4})\s+ITE?M\s+(\d{1,6})\b/i,
+      // "Item 042 do PCA 2026"
+      /\bITE?M\s+(\d{1,6})[\s\-–—]*(?:DO\s+|DA\s+)?PCA(?:\s+(\d{4}))?/i,
+      // "PCA-2026-042"
+      /\b(PCA[\s\-–—_\/]+\d{4}[\s\-–—_\/]+\d{1,6})\b/i,
+      // "PCA: XX-XXXX-XXX"
+      /\bPCA\s*[:\-–—]\s*([\w\-–—_\/]{6,30})/i,
+    ];
+
+    for (const rx of padroes) {
+      const m = texto.match(rx);
+      if (m) {
+        let val;
+        if (m.length > 2 && m[2]) {
+          // Capturas múltiplas — junta
+          val = [m[1], m[2], m[3], m[4]].filter(Boolean).join('-');
+        } else {
+          val = m[0];
+        }
+        val = cleanValue(val)
+          .replace(/[\s_]+/g, '-')
+          .replace(/[\/]+/g, '-')
+          .replace(/-{2,}/g, '-')
+          .toUpperCase();
+        if (validaPcaItem(val)) return val;
+      }
     }
     return '';
   }
@@ -497,9 +503,28 @@ const DFDParser = (() => {
 
     const celulas = construirCelulas(paginas);
 
-    /* ============ EXTRAÇÃO COM VALIDADORES v6.1 ============ */
+    /* ============ TEXTO LIMPO PRIMEIRO ============ */
+    const textoCompleto = paginas
+      .flatMap(p => p.items.map(i => i.str))
+      .join(' ');
+    const textoLimpo = sanitizarTextoCompleto(textoCompleto);
+
+    /* ============ ✅ v6.2: REGEX PRIMEIRO, LABEL DEPOIS ============ */
+    const numeroDFD =
+      extrairNumeroDFDDoTexto(textoLimpo) ||
+      extrairCampoValidado(celulas,
+        ['Nº do DFD','Número do DFD','Nº do Expediente','Expediente','DFD'],
+        validaNumeroDFD);
+
+    const pcaItem =
+      extrairPcaItemDoTexto(textoLimpo) ||
+      extrairCampoValidado(celulas,
+        ['Item / Código do PCA','Item do PCA','Código do PCA','Código no PCA','Nº do Item no PCA'],
+        validaPcaItem);
+
+    /* ============ EXTRAÇÃO GERAL ============ */
     const campos = {
-      /* -------- Cabeçalho institucional -------- */
+      /* Cabeçalho institucional */
       orgao:       extrairCampoValidado(celulas, ['Órgão / Entidade','Órgão Entidade','Órgão','Entidade']),
       uasg:        extrairCampoValidado(celulas, ['UASG / Código','UASG','Código UASG']),
       unidade:     extrairCampoValidado(celulas, ['Unidade Requisitante','Unidade Demandante','Setor Requisitante','Setor Demandante','Unidade / Setor','Unidade','Setor']),
@@ -507,54 +532,49 @@ const DFDParser = (() => {
       cargo:       extrairCampoValidado(celulas, ['Cargo / Função','Cargo/Função','Cargo e Função','Cargo','Função']),
       processo:    extrairCampoValidado(celulas, ['Processo Administrativo','Nº do Processo','Processo']),
 
-      /* -------- ✅ v6.1: Data com validador específico -------- */
-      data: extrairCampoValidado(
-        celulas,
-        ['Data de Elaboração','Data da Formalização','Data do DFD','Data'],
-        validaData
-      ),
+      /* ✅ Data (regex prioritária também) */
+      data: (() => {
+        const m = textoLimpo.match(
+          /(?:Data\s+(?:de\s+Elabora[çc][ãa]o|da\s+Formaliza[çc][ãa]o|do\s+DFD)|Data)[^\d]{0,20}(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i
+        );
+        const regexVal = m ? cleanValue(m[1]) : '';
+        return (validaData(regexVal) ? regexVal : '') ||
+               extrairCampoValidado(celulas,
+                 ['Data de Elaboração','Data da Formalização','Data do DFD','Data'],
+                 validaData);
+      })(),
 
-      /* -------- ✅ v6.1: Nº do DFD com validador específico -------- */
-      numero: extrairCampoValidado(
-        celulas,
-        ['Nº do DFD','Número do DFD','Nº do Expediente','Expediente','DFD'],
-        validaNumeroDFD
-      ),
+      /* ✅ Campos corrigidos */
+      numero: numeroDFD,
+      pcaItem: pcaItem,
 
-      /* -------- ✅ v6.1: Item do PCA com validador específico -------- */
-      pcaItem: extrairCampoValidado(
-        celulas,
-        ['Item / Código do PCA','Item do PCA','Código do PCA','Código no PCA','Nº do Item no PCA','PCA'],
-        validaPcaItem
-      ),
-
-      /* -------- Objeto e Justificativa (Incisos I e II) -------- */
+      /* Objeto e Justificativa */
       objeto:        extrairCampoValidado(celulas, ['Objeto da Contratação','Objeto da Demanda','Descrição Resumida do Objeto','Descrição do Objeto','Objeto'], validaObjeto),
       justificativa: extrairCampoValidado(celulas, ['Justificativa da Necessidade Pública','Justificativa da Necessidade','Justificativa da Demanda','Justificativa'], v => v.length >= 20),
 
-      /* -------- PCA (restante) -------- */
+      /* PCA */
       pcaPrevisto: extrairCampoValidado(celulas, ['Demanda prevista no PCA','Previsão no PCA']),
 
-      /* -------- Enquadramento (Inciso II) -------- */
+      /* Enquadramento */
       dotacao:      extrairCampoValidado(celulas, ['Dotação Orçamentária','Dotação','Rubrica']),
       fonteRecurso: extrairCampoValidado(celulas, ['Fonte de Recurso','Fonte']),
       modalidade:   extrairCampoValidado(celulas, ['Modalidade Pretendida','Modalidade de Licitação','Modalidade']),
       criterio:     extrairCampoValidado(celulas, ['Critério de Julgamento','Tipo de Julgamento','Critério']),
 
-      /* -------- Prazos e entrega (Inciso VII) -------- */
+      /* Prazos */
       prazoExecucao:      extrairCampoValidado(celulas, ['Prazo de Execução','Prazo de Entrega','Prazo']),
       localEntrega:       extrairCampoValidado(celulas, ['Local de Entrega','Local']),
       condicoesPagamento: extrairCampoValidado(celulas, ['Condições de Pagamento','Forma de Pagamento']),
 
-      /* -------- Governança (Etapa 12) -------- */
+      /* Governança */
       fiscalTitular:    extrairCampoValidado(celulas, ['Fiscal Titular do Contrato','Fiscal Titular','Fiscal'], validaNome),
       fiscalSubstituto: extrairCampoValidado(celulas, ['Fiscal Substituto']),
       gestorContrato:   extrairCampoValidado(celulas, ['Gestor do Contrato','Gestor']),
 
-      /* -------- Quantitativo (Inciso IV) -------- */
+      /* Quantitativo */
       qtdDescricao: extrairCampoValidado(celulas, ['Estimativa de Quantidades','Quantidade Estimada','Quantitativo'], v => /\d/.test(v)),
 
-      /* -------- Valor (Inciso VI) -------- */
+      /* Valor */
       valor: normalizarMoeda(extrairCampoValidado(
         celulas,
         ['Valor Estimado da Contratação','Valor Total Estimado','Valor Estimado','Valor Global','Valor'],
@@ -562,78 +582,23 @@ const DFDParser = (() => {
       ))
     };
 
-    /* ============ FALLBACKS POR REGEX NO TEXTO PLANO ============ */
-    const textoCompleto = paginas
-      .flatMap(p => p.items.map(i => i.str))
-      .join(' ');
-
-    const textoLimpo = sanitizarTextoCompleto(textoCompleto);
-
-    /* ✅ Nº do DFD — regex dedicado */
-    if (!campos.numero || !validaNumeroDFD(campos.numero)) {
-      // Padrão 1: "DFD 042/2026" ou "DFD-042/2026"
-      let m = textoLimpo.match(/\bDFD[\s\-–—:]*n?[º°]?\s*(\d{1,6}\s*[\/\-–—]\s*\d{2,4})\b/i);
-      if (m) campos.numero = cleanValue(m[1]).replace(/\s*[\/\-–—]\s*/, '/');
-
-      // Padrão 2: "Nº do DFD: 042/2026"
-      if (!campos.numero) {
-        m = textoLimpo.match(/(?:N[º°]?\s*do\s*DFD|DFD)[^\d]{0,15}(\d{1,6}\s*[\/\-–—]\s*\d{2,4})/i);
-        if (m) campos.numero = cleanValue(m[1]).replace(/\s*[\/\-–—]\s*/, '/');
-      }
-    }
-
-    /* ✅ Item do PCA — regex dedicado */
-    if (!campos.pcaItem || !validaPcaItem(campos.pcaItem)) {
-      // Padrão 1: "PCA-2026-ITEM-042"
-      let m = textoLimpo.match(/\b(PCA[\s\-–—_]*\d{4}[\s\-–—_]*ITE?M[\s\-–—_]*\d{1,6})\b/i);
-      if (m) campos.pcaItem = cleanValue(m[1]).replace(/[\s_]+/g, '-').toUpperCase();
-
-      // Padrão 2: "ITEM-042 do PCA" ou "Item 042 (PCA)"
-      if (!campos.pcaItem) {
-        m = textoLimpo.match(/\bItem\s+([\w\-]{3,15})\s*(?:do\s+)?PCA\b/i);
-        if (m) campos.pcaItem = cleanValue(m[1]).toUpperCase();
-      }
-
-      // Padrão 3: só "PCA-XXXX-XXX"
-      if (!campos.pcaItem) {
-        m = textoLimpo.match(/\b(PCA[\s\-–—_][\w\-]{3,20})\b/i);
-        if (m) campos.pcaItem = cleanValue(m[1]).replace(/[\s_]+/g, '-').toUpperCase();
-      }
-    }
-
-    /* ✅ Data — regex dedicado */
-    if (!campos.data || !validaData(campos.data)) {
-      const m = textoLimpo.match(
-        /(?:Data\s+(?:de\s+Elabora[çc][ãa]o|da\s+Formaliza[çc][ãa]o|do\s+DFD)|Data)[^\d]{0,20}(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i
-      );
-      if (m) campos.data = cleanValue(m[1]);
-    }
-
-    /* E-mail */
+    /* ============ FALLBACKS EXTRAS NO TEXTO LIMPO ============ */
     if (!campos.email) {
       const emailM = textoLimpo.match(/([\w._%+\-]+@[\w.\-]+\.[A-Za-z]{2,})/);
       if (emailM) campos.email = cleanValue(emailM[1]);
     }
-
-    /* Telefone */
     if (!campos.telefone) {
       const telM = textoLimpo.match(/(?:Telefone|Tel|Fone|Ramal)\s*[:\-–—]?\s*(\(?\d{2}\)?\s*[\s\-]?\d{4,5}[\s\-]?\d{4})/i);
       if (telM) campos.telefone = cleanValue(telM[1]);
     }
-
-    /* Modalidade */
     if (!campos.modalidade) {
       const m = textoLimpo.match(/\b(Preg[ãa]o\s+Eletr[ôo]nico|Concorr[êe]ncia\s+Eletr[ôo]nica|Dispensa\s+Eletr[ôo]nica|Inexigibilidade|Leil[ãa]o|Di[áa]logo\s+Competitivo)\b/i);
       if (m) campos.modalidade = cleanValue(m[1]);
     }
-
-    /* Critério */
     if (!campos.criterio) {
       const m = textoLimpo.match(/\b(Menor\s+Pre[çc]o|Maior\s+Desconto|Melhor\s+T[ée]cnica|T[ée]cnica\s+e\s+Pre[çc]o|Maior\s+Lance|Maior\s+Retorno\s+Econ[ôo]mico)\b/i);
       if (m) campos.criterio = cleanValue(m[1]);
     }
-
-    /* Valor (fallback) */
     if (!campos.valor) {
       const m = textoLimpo.match(/R\$\s*([\d]{1,3}(?:[.\s]\d{3})*(?:,\d{2})?|\d+(?:[.,]\d{2})?)/);
       if (m) campos.valor = normalizarMoeda(m[1]);
@@ -665,7 +630,9 @@ const DFDParser = (() => {
     parse, fromJSON, fromPDF,
     cleanValue, normalizarMoeda,
     ehRuido, sanitizarTextoCompleto,
-    validaNumeroDFD, validaPcaItem, validaData, validaObjeto, validaNome, validaValor
+    validaNumeroDFD, validaPcaItem, validaData,
+    validaObjeto, validaNome, validaValor,
+    extrairNumeroDFDDoTexto, extrairPcaItemDoTexto
   };
 })();
 
