@@ -3,17 +3,43 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>OmniLicit · LicitaETP — Estudo Técnico Preliminar | Lei nº 14.133/2021</title>
+<title>LicitaETP · OmniLicit — Estudo Técnico Preliminar | Lei nº 14.133/2021</title>
 
-<meta name="theme-color" content="#00A896" media="(prefers-color-scheme: darkl)" />
-<meta name="theme-color" content="#0A0F1E" media="(prefers-color-scheme: ligtht)" />
+<!-- ✅ Favicon apontando para a logo oficial na raiz -->
+<link id="favicon" rel="icon" type="image/png" href="OmniLicit.png" />
+<link rel="apple-touch-icon" href="OmniLicit.png" />
 
-<!-- ✅ Favicon dinâmico — será preenchido por app.js com a logo real -->
-<link id="favicon" rel="icon" href="data:," />
+<meta name="theme-color" content="#0F172A" media="(prefers-color-scheme: dark)" />
+<meta name="theme-color" content="#F8FAFC" media="(prefers-color-scheme: light)" />
+
+<!-- Anti-flash: aplica tema ANTES do render -->
+<script>
+  (function () {
+    try {
+      var t = localStorage.getItem('licitaetp_theme');
+      if (t !== 'light' && t !== 'dark') t = 'dark';
+      document.documentElement.setAttribute('data-theme', t);
+    } catch (_) {
+      document.documentElement.setAttribute('data-theme', 'dark');
+    }
+  })();
+</script>
 
 <script src="https://cdn.tailwindcss.com"></script>
 <script>
-  tailwind.config = { corePlugins: { preflight: false }, theme: { extend: { screens: { xs: '481px' } } } };
+  tailwind.config = {
+    corePlugins: { preflight: false },
+    theme: {
+      extend: {
+        colors: {
+          petroleo:  '#00A896',
+          petroleo2: '#028090',
+          executivo: '#05668D',
+        },
+        screens: { xs: '481px' },
+      },
+    },
+  };
 </script>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdfmake/0.2.7/pdfmake.min.js"></script>
@@ -24,13 +50,23 @@
 </head>
 <body>
 
+<!-- ===================================================================
+     HEADER EXECUTIVO
+     =================================================================== -->
 <header class="app-header">
-  <div class="app-header-inner max-w-[1480px] mx-auto px-3 sm:px-4 lg:px-6 py-3 flex items-center justify-between gap-3 sm:gap-4 flex-wrap">
-    <div class="brand">
-      <div class="brand-logo" id="brandLogo"></div>
-      <div class="brand-text">
-        <h1>LicitaETP</h1>
-        <p><span class="brand-eco">OmniLicit</span> · Estudo Técnico Preliminar · Lei nº 14.133/2021</p>
+  <div class="max-w-[1480px] mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between gap-3 sm:gap-4 flex-wrap">
+
+    <div class="flex items-center gap-3 min-w-0">
+      <div class="brand-logo" id="brandLogo" aria-label="OmniLicit">
+        <img src="OmniLicit.png" alt="OmniLicit" class="w-full h-full object-contain" />
+      </div>
+      <div class="min-w-0">
+        <h1 class="brand-title">LicitaETP</h1>
+        <p class="brand-subtitle hidden sm:block">
+          <span class="brand-eco">OmniLicit</span>
+          <span class="opacity-50">·</span>
+          Estudo Técnico Preliminar · Lei nº 14.133/2021
+        </p>
       </div>
     </div>
 
@@ -39,17 +75,17 @@
 
       <button class="btn btn-ghost btn-icon" onclick="abrirImportarDFD()" title="Importar DFD (PDF/JSON)">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="12" y1="18" x2="12" y2="12"/><polyline points="9 15 12 12 15 15"/></svg>
-        <span>Importar DFD</span>
+        <span class="hidden sm:inline">Importar DFD</span>
       </button>
 
       <input type="file" id="jsonFile" accept=".json,application/json" hidden />
       <button class="btn btn-ghost btn-icon" onclick="salvarRascunho()" title="Salvar rascunho (JSON)">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-        <span>Salvar</span>
+        <span class="hidden lg:inline">Salvar</span>
       </button>
       <button class="btn btn-ghost btn-icon" onclick="abrirCarregarRascunho()" title="Carregar rascunho (JSON)">
         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-        <span>Carregar</span>
+        <span class="hidden lg:inline">Carregar</span>
       </button>
 
       <button class="btn btn-ghost btn-icon" onclick="abrirAjuda()" title="Ajuda / Sobre">
@@ -63,18 +99,22 @@
 
       <button class="btn btn-accent" onclick="gerarPDF()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        <span>Gerar PDF</span>
+        <span class="hidden xs:inline">Gerar PDF</span>
       </button>
     </div>
   </div>
 </header>
 
-<div class="app-layout max-w-[1480px] mx-auto px-3 sm:px-4 lg:px-6 py-3 sm:py-4 lg:py-6 grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)] gap-3 sm:gap-4 lg:gap-6">
+<!-- ===================================================================
+     LAYOUT PRINCIPAL
+     =================================================================== -->
+<div class="max-w-[1480px] mx-auto px-3 sm:px-5 lg:px-8 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-[280px_minmax(0,1fr)] xl:grid-cols-[300px_minmax(0,1fr)] gap-4 lg:gap-6">
 
+  <!-- ============ SIDEBAR ============ -->
   <aside class="sidebar min-w-0">
     <div class="card sidebar-card">
       <div class="sidebar-top">
-        <div class="sidebar-row">
+        <div class="flex items-center justify-between mb-2">
           <span class="sidebar-label">Etapas do ETP</span>
           <span id="stepCounter" class="sidebar-counter">1 / 13</span>
         </div>
@@ -84,10 +124,11 @@
     </div>
   </aside>
 
+  <!-- ============ MAIN ============ -->
   <main class="main-area min-w-0">
     <div class="card main-card">
 
-      <!-- ============ 0 · IDENTIFICAÇÃO ============ -->
+      <!-- ===== 0 · IDENTIFICAÇÃO ===== -->
       <section data-panel="0" class="panel">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -97,15 +138,19 @@
           </div>
         </div>
 
-        <div class="dfd-callout" onclick="abrirImportarDFD()" role="button" tabindex="0">
-          <div class="dfd-callout-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><polyline points="7 11 12 16 17 11"/><path d="M5 21h14"/></svg>
+        <!-- Hero DFD -->
+        <div class="hero-dropzone" onclick="abrirImportarDFD()" role="button" tabindex="0" aria-label="Importar DFD">
+          <div class="hero-icon">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
           </div>
-          <div class="dfd-callout-text">
-            <strong>Importar DFD automaticamente</strong>
-            <span>Arraste o JSON (do LicitaReq) ou o PDF oficial do DFD — os campos serão preenchidos automaticamente.</span>
+          <div class="hero-text">
+            <h3>Importar DFD automaticamente</h3>
+            <p>Arraste o <strong>PDF</strong> ou <strong>JSON</strong> do LicitaReq — os 11 incisos serão pré-preenchidos.</p>
           </div>
-          <div class="dfd-callout-action"><span class="dfd-chip">PDF</span><span class="dfd-chip">JSON</span></div>
+          <div class="hero-chips">
+            <span class="chip chip-pdf">PDF</span>
+            <span class="chip chip-json">JSON</span>
+          </div>
         </div>
 
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
@@ -131,7 +176,7 @@
               <input type="file" id="logoFile" accept="image/*" hidden />
               <div class="dropzone-empty" id="logoDropzoneEmpty">
                 <div class="dropzone-icon">
-                  <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
                 </div>
                 <p class="dropzone-title">Arraste o logotipo aqui</p>
                 <p class="dropzone-hint">ou <strong>clique para selecionar</strong> · PNG, JPG ou SVG · máx 2 MB</p>
@@ -149,7 +194,7 @@
         </div>
       </section>
 
-      <!-- ============ 1 · INCISO I ============ -->
+      <!-- ===== 1 · INCISO I ===== -->
       <section data-panel="1" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -158,17 +203,16 @@
             <p class="panel-desc">Demonstração do problema a ser resolvido sob a ótica do interesse público.</p>
           </div>
         </div>
-        <div>
-          <label class="lbl">Necessidade / Problema a ser resolvido *</label>
-          <textarea id="necessidade" class="ta" placeholder="Descreva o problema público, sua dimensão, o público afetado e o impacto da não contratação."></textarea>
-        </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-          <div><label class="lbl">Causa-raiz do problema</label><textarea id="causaRaiz" class="ta ta-sm"></textarea></div>
-          <div><label class="lbl">Público-alvo / Beneficiários</label><textarea id="publicoAlvo" class="ta ta-sm"></textarea></div>
+        <div class="grid grid-cols-1 gap-3 sm:gap-4">
+          <div><label class="lbl">Necessidade / Problema a ser resolvido *</label><textarea id="necessidade" class="ta" placeholder="Descreva o problema público, sua dimensão, o público afetado e o impacto da não contratação."></textarea></div>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+            <div><label class="lbl">Causa-raiz do problema</label><textarea id="causaRaiz" class="ta ta-sm"></textarea></div>
+            <div><label class="lbl">Público-alvo / Beneficiários</label><textarea id="publicoAlvo" class="ta ta-sm"></textarea></div>
+          </div>
         </div>
       </section>
 
-      <!-- ============ 2 · INCISO II ============ -->
+      <!-- ===== 2 · INCISO II ===== -->
       <section data-panel="2" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -189,7 +233,7 @@
           </div>
           <div class="sm:col-span-2"><label class="lbl">Item / Código do PCA</label><input id="pcaItem" class="inp" /></div>
         </div>
-        <div><label class="lbl">Justificativa do Alinhamento</label><textarea id="pcaJustificativa" class="ta"></textarea></div>
+        <div class="mt-3 sm:mt-4"><label class="lbl">Justificativa do Alinhamento</label><textarea id="pcaJustificativa" class="ta"></textarea></div>
 
         <div class="mt-4">
           <label class="lbl">Enquadramento Orçamentário e Legal</label>
@@ -224,7 +268,7 @@
         </div>
       </section>
 
-      <!-- ============ 3 · INCISO III ============ -->
+      <!-- ===== 3 · INCISO III ===== -->
       <section data-panel="3" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -244,7 +288,7 @@
             <label class="chk"><input type="checkbox" name="sustent" value="Outros critérios ambientais"><span>Outros critérios ambientais</span></label>
           </div>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 mt-3">
           <div><label class="lbl">Requisitos Técnicos e de Desempenho</label><textarea id="reqTecnicos" class="ta ta-sm"></textarea></div>
           <div><label class="lbl">Requisitos de Habilitação Técnica</label><textarea id="reqHabilitacao" class="ta ta-sm"></textarea></div>
           <div><label class="lbl">Garantia, Assistência Técnica e Manutenção</label><textarea id="reqGarantia" class="ta ta-sm"></textarea></div>
@@ -252,7 +296,7 @@
         </div>
       </section>
 
-      <!-- ============ 4 · INCISO IV ============ -->
+      <!-- ===== 4 · INCISO IV ===== -->
       <section data-panel="4" class="panel hidden">
         <div class="panel-head row-between">
           <div class="panel-head-left">
@@ -262,22 +306,17 @@
           </div>
           <button class="btn btn-ghost" onclick="addQtd()">+ Item</button>
         </div>
-
-        <div>
-          <label class="lbl">Descrição Quantitativa Extraída do DFD</label>
-          <textarea id="qtdDescricao" class="ta ta-sm" placeholder="Ex.: 30 (trinta) workstations e 20 (vinte) notebooks para o parque tecnológico"></textarea>
-        </div>
-
+        <div class="mb-3"><label class="lbl">Descrição Quantitativa Extraída do DFD</label><textarea id="qtdDescricao" class="ta ta-sm" placeholder="Ex.: 30 (trinta) workstations e 20 (vinte) notebooks para o parque tecnológico"></textarea></div>
         <div class="table-wrap">
           <table class="grid-table">
             <thead><tr><th style="width:8%">Item</th><th style="width:26%">Descrição</th><th style="width:10%">Qtd.</th><th style="width:10%">Unid.</th><th style="width:38%">Memória de Cálculo</th><th style="width:8%"></th></tr></thead>
             <tbody id="tbQtd"></tbody>
           </table>
         </div>
-        <div><label class="lbl">Metodologia Geral da Estimativa</label><textarea id="metodoQtd" class="ta ta-sm"></textarea></div>
+        <div class="mt-3"><label class="lbl">Metodologia Geral da Estimativa</label><textarea id="metodoQtd" class="ta ta-sm"></textarea></div>
       </section>
 
-      <!-- ============ 5 · INCISO V ============ -->
+      <!-- ===== 5 · INCISO V ===== -->
       <section data-panel="5" class="panel hidden">
         <div class="panel-head row-between">
           <div class="panel-head-left">
@@ -293,10 +332,10 @@
             <tbody id="tbMercado"></tbody>
           </table>
         </div>
-        <div><label class="lbl">Conclusão do Levantamento de Mercado</label><textarea id="conclusaoMercado" class="ta ta-sm"></textarea></div>
+        <div class="mt-3"><label class="lbl">Conclusão do Levantamento de Mercado</label><textarea id="conclusaoMercado" class="ta ta-sm"></textarea></div>
       </section>
 
-      <!-- ============ 6 · INCISO VI ============ -->
+      <!-- ===== 6 · INCISO VI ===== -->
       <section data-panel="6" class="panel hidden">
         <div class="panel-head row-between">
           <div class="panel-head-left">
@@ -306,7 +345,7 @@
           </div>
           <button class="btn btn-ghost" onclick="addPreco()">+ Cotação</button>
         </div>
-        <div>
+        <div class="mb-3">
           <label class="lbl">Método de Estimativa Adotado (art. 23, Lei 14.133/2021)</label>
           <select id="metodoPreco" class="sel">
             <option>Painel de Preços (Compras.gov.br)</option>
@@ -323,7 +362,7 @@
             <tbody id="tbPreco"></tbody>
           </table>
         </div>
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4 mt-3">
           <div class="lg:col-span-2"><label class="lbl">Observações sobre a Estimativa</label><textarea id="obsPreco" class="ta ta-sm"></textarea></div>
           <div class="total-box">
             <p class="total-box-lbl">Valor Total Estimado</p>
@@ -332,7 +371,7 @@
         </div>
       </section>
 
-      <!-- ============ 7 · INCISO VII ============ -->
+      <!-- ===== 7 · INCISO VII ===== -->
       <section data-panel="7" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -341,20 +380,19 @@
             <p class="panel-desc">Visão integrada do ciclo de vida do objeto contratado.</p>
           </div>
         </div>
-        <div><label class="lbl">Descrição Integrada da Solução *</label><textarea id="descricaoSolucao" class="ta"></textarea></div>
+        <div class="mb-3"><label class="lbl">Descrição Integrada da Solução *</label><textarea id="descricaoSolucao" class="ta"></textarea></div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div><label class="lbl">Entregas (Deliverables) e Prazos</label><textarea id="entregas" class="ta ta-sm"></textarea></div>
           <div><label class="lbl">Ciclo de Vida e Sustentabilidade</label><textarea id="cicloVida" class="ta ta-sm"></textarea></div>
         </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 mt-3">
           <div><label class="lbl">Prazo de Execução</label><input id="prazoExecucao" class="inp" placeholder="Ex.: 12 meses"></div>
           <div><label class="lbl">Local de Entrega</label><input id="localEntrega" class="inp" placeholder="Ex.: Almoxarifado Central"></div>
           <div><label class="lbl">Condições de Pagamento</label><input id="condicoesPagamento" class="inp" placeholder="Ex.: 30 dias após entrega"></div>
         </div>
       </section>
 
-      <!-- ============ 8 · INCISO VIII ============ -->
+      <!-- ===== 8 · INCISO VIII ===== -->
       <section data-panel="8" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -374,10 +412,10 @@
           </div>
           <div class="sm:col-span-2"><label class="lbl">Itens / Lotes Parceláveis</label><input id="itensParcelaveis" class="inp" /></div>
         </div>
-        <div><label class="lbl">Fundamentação da Decisão</label><textarea id="justificativaParcelamento" class="ta"></textarea></div>
+        <div class="mt-3"><label class="lbl">Fundamentação da Decisão</label><textarea id="justificativaParcelamento" class="ta"></textarea></div>
       </section>
 
-      <!-- ============ 9 · INCISO IX ============ -->
+      <!-- ===== 9 · INCISO IX ===== -->
       <section data-panel="9" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -386,14 +424,14 @@
             <p class="panel-desc">Resultados mensuráveis e ganhos de economicidade.</p>
           </div>
         </div>
-        <div><label class="lbl">Resultados Esperados *</label><textarea id="resultados" class="ta"></textarea></div>
+        <div class="mb-3"><label class="lbl">Resultados Esperados *</label><textarea id="resultados" class="ta"></textarea></div>
         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div><label class="lbl">Ganhos de Economicidade</label><textarea id="economicidade" class="ta ta-sm"></textarea></div>
           <div><label class="lbl">Indicadores de Aferição</label><textarea id="indicadores" class="ta ta-sm"></textarea></div>
         </div>
       </section>
 
-      <!-- ============ 10 · INCISO X ============ -->
+      <!-- ===== 10 · INCISO X ===== -->
       <section data-panel="10" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -402,14 +440,14 @@
             <p class="panel-desc">Ações necessárias antes da contratação e dependências entre contratações.</p>
           </div>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
           <div><label class="lbl">Providências Prévias ao Certame</label><textarea id="providencias" class="ta"></textarea></div>
           <div><label class="lbl">Contratações Correlatas e Interdependentes</label><textarea id="correlatas" class="ta"></textarea></div>
         </div>
-        <div><label class="lbl">Impacto da Não Realização das Providências</label><textarea id="impactoProvidencias" class="ta ta-sm"></textarea></div>
+        <div class="mt-3"><label class="lbl">Impacto da Não Realização das Providências</label><textarea id="impactoProvidencias" class="ta ta-sm"></textarea></div>
       </section>
 
-      <!-- ============ 11 · INCISO XI ============ -->
+      <!-- ===== 11 · INCISO XI ===== -->
       <section data-panel="11" class="panel hidden">
         <div class="panel-head">
           <div class="panel-head-left">
@@ -425,10 +463,10 @@
           </div>
           <div class="sm:col-span-2"><label class="lbl">Recomendações e Condicionantes</label><input id="recomendacoes" class="inp" /></div>
         </div>
-        <div><label class="lbl">Conclusão Técnica Fundamentada *</label><textarea id="conclusao" class="ta"></textarea></div>
+        <div class="mt-3"><label class="lbl">Conclusão Técnica Fundamentada *</label><textarea id="conclusao" class="ta"></textarea></div>
       </section>
 
-      <!-- ============ 12 · APROVADORES ============ -->
+      <!-- ===== 12 · APROVADORES ===== -->
       <section data-panel="12" class="panel hidden">
         <div class="panel-head row-between">
           <div class="panel-head-left">
@@ -450,9 +488,9 @@
 
     </div>
 
-    <div class="nav-bar flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 mt-4 sm:mt-6">
+    <div class="flex flex-col-reverse sm:flex-row items-stretch sm:items-center justify-between gap-2 sm:gap-3 mt-4 sm:mt-6">
       <button id="btnVoltar" class="btn btn-ghost" onclick="goTo(current-1)">← Voltar</button>
-      <div class="nav-bar-right flex flex-col sm:flex-row gap-2">
+      <div class="flex flex-col sm:flex-row gap-2">
         <button id="btnProximo" class="btn btn-primary" onclick="goTo(current+1)">Próximo →</button>
         <button id="btnGerar" class="btn btn-accent hidden" onclick="gerarPDF()">Gerar PDF do ETP</button>
       </div>
@@ -460,31 +498,72 @@
   </main>
 </div>
 
-<!-- ============ MODAL WELCOME ============ -->
+<!-- ===================================================================
+     MODAL WELCOME — Onboarding com persistência
+     =================================================================== -->
 <div class="modal-overlay" id="welcomeModal" aria-hidden="true">
   <div class="modal modal-welcome" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle">
     <div class="modal-welcome-hero">
-      <div class="modal-welcome-logo" id="welcomeLogo"></div>
+      <div class="modal-welcome-logo" id="welcomeLogo">
+        <img src="OmniLicit.png" alt="OmniLicit" class="w-full h-full object-contain" />
+      </div>
       <span class="modal-welcome-badge">OmniLicit · LicitaETP v5.0</span>
     </div>
+
     <h2 class="modal-title" id="welcomeTitle">Bem-vindo ao LicitaETP</h2>
-    <p class="modal-subtitle">Sistema de elaboração do <strong>Estudo Técnico Preliminar</strong> em conformidade com o <strong>art. 18, § 1º, da Lei nº 14.133/2021</strong> — módulo integrante do ecossistema <em>OmniLicit</em> (LicitaReq · LicitaETP · LicitaAudit).</p>
+    <p class="modal-subtitle">
+      Sistema de elaboração do <strong>Estudo Técnico Preliminar</strong> em conformidade com o
+      <strong>art. 18, § 1º, da Lei nº 14.133/2021</strong> — módulo integrante do ecossistema
+      <em>OmniLicit</em> (LicitaReq · LicitaETP · LicitaAudit).
+    </p>
 
     <div class="modal-welcome-grid">
-      <div class="welcome-card"><div class="welcome-card-icon" style="background:rgba(59,130,246,.15);color:#3B82F6"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13"/><polyline points="7 11 12 16 17 11"/><path d="M5 21h14"/></svg></div><h4>Importação de DFD</h4><p>Arraste um DFD (PDF ou JSON do LicitaReq) e o ETP é pré-preenchido automaticamente — inclusive enquadramento, prazos e governança.</p></div>
-      <div class="welcome-card"><div class="welcome-card-icon" style="background:rgba(0,168,150,.15);color:#00A896"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div><h4>11 Incisos Obrigatórios</h4><p>Wizard guiado com validação em tempo real do score de conformidade legal.</p></div>
-      <div class="welcome-card"><div class="welcome-card-icon" style="background:rgba(245,158,11,.15);color:#F59E0B"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div><h4>PDF Executivo Auditável</h4><p>Selo <strong>OMNILICIT::ETP::[TAG]::[ANO]</strong> com hash SHA-256 — integrável ao OmniLicit Audit.</p></div>
-      <div class="welcome-card"><div class="welcome-card-icon" style="background:rgba(5,102,141,.15);color:#05668D"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg></div><h4>Salvar / Carregar</h4><p>Guarde rascunhos em JSON e continue depois exatamente de onde parou.</p></div>
+      <div class="welcome-card">
+        <div class="welcome-card-icon" style="background:rgba(0,168,150,.12);color:#00A896">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <h4>Importação automática de DFD</h4>
+        <p>Arraste o PDF ou o JSON gerado pelo LicitaReq. O ETP é pré-preenchido com enquadramento, prazos e governança.</p>
+      </div>
+
+      <div class="welcome-card">
+        <div class="welcome-card-icon" style="background:rgba(5,102,141,.12);color:#05668D">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+        </div>
+        <h4>11 Incisos obrigatórios</h4>
+        <p>Wizard guiado com validação em tempo real e score de conformidade legal atualizado a cada campo preenchido.</p>
+      </div>
+
+      <div class="welcome-card">
+        <div class="welcome-card-icon" style="background:rgba(245,158,11,.12);color:#F59E0B">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        </div>
+        <h4>PDF auditável</h4>
+        <p>Selo <strong>OMNILICIT::ETP::[TAG]::[ANO]</strong> com hash SHA-256, pronto para validação pelo OmniLicit Audit.</p>
+      </div>
+
+      <div class="welcome-card">
+        <div class="welcome-card-icon" style="background:rgba(0,168,150,.12);color:#00A896">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>
+        </div>
+        <h4>Salvar e continuar</h4>
+        <p>Guarde o progresso em JSON e retome exatamente de onde parou — em qualquer dispositivo.</p>
+      </div>
     </div>
 
     <div class="modal-welcome-footer">
-      <label class="chk-inline"><input type="checkbox" id="welcomeDontShow" /><span>Não me mostrar novamente</span></label>
+      <label class="chk-inline">
+        <input type="checkbox" id="welcomeDontShow" />
+        <span>Não me mostrar novamente</span>
+      </label>
       <button class="btn btn-accent" onclick="fecharWelcome()">Começar agora →</button>
     </div>
   </div>
 </div>
 
-<!-- ============ MODAL DFD ============ -->
+<!-- ===================================================================
+     MODAL DFD
+     =================================================================== -->
 <div class="modal-overlay" id="dfdModal" aria-hidden="true">
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="dfdTitle">
     <div class="modal-head">
